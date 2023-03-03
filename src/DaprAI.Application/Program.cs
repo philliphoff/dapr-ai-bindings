@@ -1,11 +1,17 @@
 using System.Text.Json.Serialization;
+using Dapr.Client;
+using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
+
+const string ChatGpt = "chat-gpt";
+const string AzureAI = "azure-ai";
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddDaprClient();
 
 var app = builder.Build();
 
@@ -16,17 +22,30 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+app.MapGet(
+    "/prompt",
+    async ([FromQuery]string? component, [FromServices] DaprClient daprClient) =>
+    {
+        component ??= ChatGpt;
 
-app.MapGet("/prompt", () =>
+        var response = await daprClient.InvokeBindingAsync<string, PromptResponse>(component, "prompt", "Hello, World!");
+
+        return response;
+    })
+    .WithName("Prompt")
+    .WithOpenApi();
+
+app.MapPost($"/{AzureAI}", () =>
 {
-    return new PromptResponse("It was great!");
-})
-.WithName("Prompt")
-.WithOpenApi();
+    // TODO: Handle chat response.
+    return Results.Accepted();
+});
+
+app.MapPost($"/{ChatGpt}", () =>
+{
+    // TODO: Handle chat response.
+    return Results.Accepted();
+});
 
 app.Run();
 

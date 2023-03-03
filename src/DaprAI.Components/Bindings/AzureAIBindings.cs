@@ -1,3 +1,4 @@
+using System.Text;
 using Dapr.PluggableComponents.Components;
 using Dapr.PluggableComponents.Components.Bindings;
 
@@ -11,12 +12,12 @@ internal sealed class AzureAIBindings : IInputBinding, IOutputBinding
 
     public Task InitAsync(MetadataRequest request, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        return Task.CompletedTask;
     }
 
     public Task ReadAsync(MessageDeliveryHandler<InputBindingReadRequest, InputBindingReadResponse> deliveryHandler, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        return Task.Delay(-1, cancellationToken);
     }
 
     #endregion
@@ -25,12 +26,16 @@ internal sealed class AzureAIBindings : IInputBinding, IOutputBinding
 
     public Task<OutputBindingInvokeResponse> InvokeAsync(OutputBindingInvokeRequest request, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        return request.Operation switch
+        {
+            "prompt" => Task.FromResult(new OutputBindingInvokeResponse { Data = new PromptResponse("Hello from Azure AI!").ToBytes() }),
+            _ => throw new NotImplementedException(),
+        };
     }
 
     public Task<string[]> ListOperationsAsync(CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        return Task.FromResult(new[] { "prompt" });
     }
 
     #endregion
