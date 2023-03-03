@@ -22,13 +22,13 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.MapGet(
+app.MapPost(
     "/prompt",
-    async ([FromQuery]string? component, [FromServices] DaprClient daprClient) =>
+    async ([FromQuery]string? component, [FromBody]PromptRequest request, [FromServices] DaprClient daprClient) =>
     {
         component ??= ChatGpt;
 
-        var response = await daprClient.InvokeBindingAsync<string, PromptResponse>(component, "prompt", "Hello, World!");
+        var response = await daprClient.InvokeBindingAsync<PromptRequest, PromptResponse>(component, "prompt", request);
 
         return response;
     })
@@ -48,6 +48,10 @@ app.MapPost($"/{ChatGpt}", () =>
 });
 
 app.Run();
+
+record PromptRequest(
+    [property: JsonPropertyName("prompt")]
+    string Prompt);
 
 record PromptResponse(
     [property: JsonPropertyName("response")]

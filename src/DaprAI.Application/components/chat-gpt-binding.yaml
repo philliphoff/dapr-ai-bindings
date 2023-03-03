@@ -5,4 +5,12 @@ metadata:
 spec:
   type: bindings.chat-gpt
   version: v1
-  metadata: []
+  metadata:
+    - name: open-api-endpoint
+      value: https://api.openai.com
+    - name: open-api-key
+      secretKeyRef:
+        name: open-api-key
+        key: open-api-key
+auth:
+  secretStore: secrets
