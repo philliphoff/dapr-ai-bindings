@@ -24,15 +24,28 @@ if (app.Environment.IsDevelopment())
 
 app.MapPost(
     "/prompt",
-    async ([FromQuery]string? component, [FromBody]PromptRequest request, [FromServices] DaprClient daprClient) =>
+    async ([FromQuery] string? component, [FromBody] PromptRequest request, [FromServices] DaprClient daprClient) =>
     {
         component ??= ChatGpt;
 
-        var response = await daprClient.InvokeBindingAsync<PromptRequest, PromptResponse>(component, "prompt", request);
+        var response = await daprClient.PromptAIAsync(component, request);
 
         return response;
     })
     .WithName("Prompt")
+    .WithOpenApi();
+
+app.MapPost(
+    "/summarize",
+    async ([FromQuery] string? component, [FromBody] PromptRequest request, [FromServices] DaprClient daprClient) =>
+    {
+        component ??= ChatGpt;
+
+        var response = await daprClient.SummarizeAIAsync(component, request);
+
+        return response;
+    })
+    .WithName("Summarize")
     .WithOpenApi();
 
 app.MapPost($"/{AzureAI}", () =>
@@ -49,10 +62,19 @@ app.MapPost($"/{ChatGpt}", () =>
 
 app.Run();
 
-record PromptRequest(
+internal sealed record PromptRequest(
     [property: JsonPropertyName("prompt")]
     string Prompt);
 
-record PromptResponse(
+internal sealed record PromptResponse(
     [property: JsonPropertyName("response")]
     string Response);
+
+internal static class DaprClientExtensions
+{
+    public static Task<PromptResponse> PromptAIAsync(this DaprClient daprClient, string component, PromptRequest request) =>
+        daprClient.InvokeBindingAsync<PromptRequest, PromptResponse>(component, "prompt", request);
+
+    public static Task<PromptResponse> SummarizeAIAsync(this DaprClient daprClient, string component, PromptRequest request) =>
+        daprClient.InvokeBindingAsync<PromptRequest, PromptResponse>(component, "summarize", request);
+}

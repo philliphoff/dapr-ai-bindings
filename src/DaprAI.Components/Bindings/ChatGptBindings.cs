@@ -8,8 +8,6 @@ namespace DaprAI.Bindings;
 
 internal sealed class ChatGptBindings : IInputBinding, IOutputBinding
 {
-    public const string ChatGpt = "chatgpt";
-
     private string? openApiEndpoint;
     private string? openApiKey;
 

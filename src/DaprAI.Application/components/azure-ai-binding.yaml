@@ -5,4 +5,12 @@ metadata:
 spec:
   type: bindings.azure-ai
   version: v1
-  metadata: []
+  metadata:
+    - name: azure-ai-endpoint
+      value: https://phoff-ai.cognitiveservices.azure.com
+    - name: azure-ai-key
+      secretKeyRef:
+        name: azure-ai-key
+        key: azure-ai-key
+auth:
+  secretStore: secrets
