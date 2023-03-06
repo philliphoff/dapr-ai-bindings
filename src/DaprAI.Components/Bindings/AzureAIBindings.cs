@@ -34,7 +34,6 @@ internal sealed class AzureAIBindings : IInputBinding, IOutputBinding
     {
         return request.Operation switch
         {
-            "prompt" => Task.FromResult(new OutputBindingInvokeResponse { Data = new PromptResponse("Hello from Azure AI!").ToBytes() }),
             "summarize" => this.SummarizeAsync(request, cancellationToken),
             _ => throw new NotImplementedException(),
         };
@@ -42,42 +41,33 @@ internal sealed class AzureAIBindings : IInputBinding, IOutputBinding
 
     public Task<string[]> ListOperationsAsync(CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(new[] { "prompt", "summarize" });
+        return Task.FromResult(new[] { "summarize" });
     }
 
     #endregion
 
-    public async Task<OutputBindingInvokeResponse> SummarizeAsync(OutputBindingInvokeRequest request, CancellationToken cancellationToken = default)
+    private async Task<OutputBindingInvokeResponse> SummarizeAsync(OutputBindingInvokeRequest request, CancellationToken cancellationToken)
     {
         var credentials = new AzureKeyCredential(this.azureAIKey!);
         var client = new TextAnalyticsClient(new Uri(this.azureAIEndpoint!), credentials);
 
         var summarizeRequest = PromptRequest.FromBytes(request.Data.Span);
 
-        var batchInput = new List<string>
-        {
-            summarizeRequest.Prompt
-        };
+        var operation = await client.StartAnalyzeActionsAsync(
+            new[]
+            {
+                summarizeRequest.Prompt
+            },
+            new TextAnalyticsActions
+            {
+                ExtractSummaryActions = new[] { new ExtractSummaryAction() }
+            },
+            cancellationToken: cancellationToken);
 
-        TextAnalyticsActions actions = new TextAnalyticsActions()
-        {
-            ExtractSummaryActions = new List<ExtractSummaryAction>() { new ExtractSummaryAction() }
-        };
+        await operation.WaitForCompletionAsync(cancellationToken);
 
-            // Start analysis process.
-        AnalyzeActionsOperation operation = await client.StartAnalyzeActionsAsync(batchInput, actions);
-        await operation.WaitForCompletionAsync();
+        var sentences = new List<string>();
 
-        string summarizedText = string.Empty;
-
-        // View operation status.
-        summarizedText += $"AnalyzeActions operation has completed" + Environment.NewLine;
-        summarizedText += $"Created On   : {operation.CreatedOn}" + Environment.NewLine;
-        summarizedText += $"Expires On   : {operation.ExpiresOn}" + Environment.NewLine;
-        summarizedText += $"Id           : {operation.Id}" + Environment.NewLine;
-        summarizedText += $"Status       : {operation.Status}" + Environment.NewLine;
-
-        // View operation results.
         await foreach (AnalyzeActionsResult documentsInPage in operation.Value)
         {
             IReadOnlyCollection<ExtractSummaryActionResult> summaryResults = documentsInPage.ExtractSummaryResults;
@@ -96,17 +86,11 @@ internal sealed class AzureAIBindings : IInputBinding, IOutputBinding
                         continue;
                     }
 
-                    summarizedText += $"  Extracted the following {documentResults.Sentences.Count} sentence(s):" + Environment.NewLine;
-
-
-                    foreach (SummarySentence sentence in documentResults.Sentences)
-                    {
-                        summarizedText += $"  Sentence: {sentence.Text}" + Environment.NewLine;
-                    }
+                    sentences.AddRange(documentResults.Sentences.Select(s => s.Text));
                 }
             }
         }
 
-        return new OutputBindingInvokeResponse { Data = new PromptResponse(summarizedText).ToBytes() };
+        return new OutputBindingInvokeResponse { Data = new PromptResponse(String.Join(' ', sentences)).ToBytes() };
     }
 }

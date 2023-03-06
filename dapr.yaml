@@ -1,8 +1,5 @@
 version: 1
 apps:
-#  - appDirPath: ./src/DaprAI.Components/
-#    appID: components
-#    command: ["dotnet", "run", "DaprAI.Components.csproj"]
   - appDirPath: ./src/DaprAI.Application/
     appID: application
     appPort: 5111
