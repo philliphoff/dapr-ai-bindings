@@ -34,23 +34,37 @@ internal sealed class ChatGptBindings : IInputBinding, IOutputBinding
     {
         return request.Operation switch
         {
-            "prompt" => this.PromptAsync(request),
+            "prompt" => this.PromptAsync(request, cancellationToken),
+            "summarize" => this.SummarizeAsync(request, cancellationToken),
             _ => throw new NotImplementedException(),
         };
     }
 
     public Task<string[]> ListOperationsAsync(CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(new[] { "prompt" });
+        return Task.FromResult(new[] { "prompt", "summarize" });
     }
 
     #endregion
 
-    private async Task<OutputBindingInvokeResponse> PromptAsync(OutputBindingInvokeRequest request)
+    private async Task<OutputBindingInvokeResponse> PromptAsync(OutputBindingInvokeRequest request, CancellationToken cancellationToken)
     {
         var promptRequest = PromptRequest.FromBytes(request.Data.Span);
 
         var completion = await this.OpenAICreateCompletion("text-davinci-003", promptRequest.Prompt, 0.9m, 64);
+
+        var choice = completion.choices[0];
+
+        return new OutputBindingInvokeResponse { Data = new PromptResponse(choice.text).ToBytes() };
+    }
+
+    private async Task<OutputBindingInvokeResponse> SummarizeAsync(OutputBindingInvokeRequest request, CancellationToken cancellationToken)
+    {
+        var promptRequest = PromptRequest.FromBytes(request.Data.Span);
+
+        string summarizePrompt = $"Summarize this text: {promptRequest.Prompt}";
+
+        var completion = await this.OpenAICreateCompletion("text-davinci-003", summarizePrompt, 0.9m, 64);
 
         var choice = completion.choices[0];
 
