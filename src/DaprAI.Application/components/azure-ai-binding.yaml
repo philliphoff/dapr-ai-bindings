@@ -7,7 +7,7 @@ spec:
   version: v1
   metadata:
     - name: azure-ai-endpoint
-      value: https://phoff-ai.cognitiveservices.azure.com
+      value: https://<name>.cognitiveservices.azure.com
     - name: azure-ai-key
       secretKeyRef:
         name: azure-ai-key
