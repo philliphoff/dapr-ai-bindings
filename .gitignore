@@ -1,4 +1,6 @@
+.azure/
 .dapr/
+.vscode/
 
 bin/
 obj/

@@ -7,7 +7,7 @@ using Dapr.PluggableComponents.Components.Bindings;
 
 namespace DaprAI.Bindings;
 
-internal abstract class OpenAIBindingsBase : IInputBinding, IOutputBinding
+internal abstract class OpenAIBindingsBase : IOutputBinding
 {
     private static readonly HttpClient HttpClient = new();
 
@@ -18,21 +18,12 @@ internal abstract class OpenAIBindingsBase : IInputBinding, IOutputBinding
 
     protected string? Key => this.azureOpenAIKey;
 
-    #region IInputBinding Members
+    #region IOutputBinding Members
 
     public Task InitAsync(MetadataRequest request, CancellationToken cancellationToken = default)
     {
         return this.OnInitAsync(request, cancellationToken);
     }
-
-    public Task ReadAsync(MessageDeliveryHandler<InputBindingReadRequest, InputBindingReadResponse> deliveryHandler, CancellationToken cancellationToken = default)
-    {
-        return Task.Delay(-1, cancellationToken);
-    }
-
-    #endregion
-
-    #region IOutputBinding Members
 
     public Task<OutputBindingInvokeResponse> InvokeAsync(OutputBindingInvokeRequest request, CancellationToken cancellationToken = default)
     {
