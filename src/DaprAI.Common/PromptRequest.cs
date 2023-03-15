@@ -2,9 +2,9 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace DaprAI.Bindings;
+namespace DaprAI;
 
-internal sealed record PromptRequest(
+public sealed record PromptRequest(
     [property: JsonPropertyName("prompt")]
     string Prompt)
 {

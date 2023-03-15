@@ -6,12 +6,12 @@ using Dapr.PluggableComponents.Components.Bindings;
 
 namespace DaprAI.Bindings;
 
-internal sealed class AzureAIBindings : IInputBinding, IOutputBinding
+internal sealed class AzureAIBindings : IOutputBinding
 {
     private string? azureAIEndpoint;
     private string? azureAIKey;
 
-    #region IInputBinding Members
+    #region IOutputBinding Members
 
     public Task InitAsync(MetadataRequest request, CancellationToken cancellationToken = default)
     {
@@ -20,15 +20,6 @@ internal sealed class AzureAIBindings : IInputBinding, IOutputBinding
 
         return Task.CompletedTask;
     }
-
-    public Task ReadAsync(MessageDeliveryHandler<InputBindingReadRequest, InputBindingReadResponse> deliveryHandler, CancellationToken cancellationToken = default)
-    {
-        return Task.Delay(-1, cancellationToken);
-    }
-
-    #endregion
-
-    #region IOutputBinding Members
 
     public Task<OutputBindingInvokeResponse> InvokeAsync(OutputBindingInvokeRequest request, CancellationToken cancellationToken = default)
     {

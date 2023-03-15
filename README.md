@@ -12,20 +12,27 @@ To use the Chat GPT binding, you must have an Open AI account and an [API key](h
 
 To use the Azure AI binding, you must have an [Azure Cognitive Services](https://azure.microsoft.com/en-us/products/cognitive-services/) instance and its access key.
 
+To use the Azure Open AI binding, you must have an [Azure Open AI](https://azure.microsoft.com/en-us/products/cognitive-services/openai-service) instance and its access key.
+
 To use the `.http` files to send requests, install the [REST Client](https://marketplace.visualstudio.com/items?itemName=humao.rest-client) VS Code extension.
 
 ## Setup
 
 1. Configure the Dapr components.
 
-   If using the Azure AI binding, open the `azure-ai-binding.yaml` and update the `azure-ai-endpoint` value to the endpoint of the Azure Cognitive Services instance.
-
    Create a JSON file called `secrets.json` in the repo root folder to hold the access keys. It should look something like:
 
    ```json
    {
-        "azure-ai-key": "<Azure Cognitive Services key>",
-        "open-api-key": "<Open AI API key>"
+      "azure-ai-endpoint": "https://<name>.cognitiveservices.azure.com",
+      "azure-ai-key": "<Azure Cognitive Services key>",
+
+      "azure-open-ai-deployment": "<deployed language model name>"
+      "azure-open-ai-endpoint": "https://<name>.openai.azure.com"
+      "azure-open-ai-key": "<Azure Open AI API key>"
+
+      "open-api-endpoint": "https://api.openai.com"
+      "open-api-key": "<Open AI API key>"
    }
    ```
 

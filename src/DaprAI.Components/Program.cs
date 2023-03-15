@@ -17,4 +17,11 @@ app.RegisterService(
         serviceBuilder.RegisterBinding<AzureAIBindings>();
     });
 
+app.RegisterService(
+    "azure-open-ai",
+    serviceBuilder =>
+    {
+        serviceBuilder.RegisterBinding<AzureOpenAIBindings>();
+    });
+
 app.Run();
