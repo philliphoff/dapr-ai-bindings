@@ -101,8 +101,32 @@ internal abstract class OpenAIBindingsBase : IInputBinding, IOutputBinding
 
     protected sealed record CompletionsRequest(
         [property: JsonPropertyName("prompt")]
-        string Prompt
-    );
+        string Prompt)
+    {
+        [JsonPropertyName("model")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Model { get; init; }
+
+        [JsonPropertyName("temperature")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public decimal? Temperature { get; init; }
+
+        [JsonPropertyName("max_tokens")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? MaxTokens { get; init; }
+
+        [JsonPropertyName("top_p")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public decimal? TopP { get; init; }
+
+        [JsonPropertyName("frequency_penalty")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public decimal? FrequencyPenalty { get; init; }
+
+        [JsonPropertyName("presence_penalty")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public decimal? PresencePenalty { get; init; }
+    }
 
     protected sealed record CompletionsResponseChoice
     {
