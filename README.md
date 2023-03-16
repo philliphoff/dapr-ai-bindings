@@ -12,7 +12,7 @@ To use the Chat GPT binding, you must have an Open AI account and an [API key](h
 
 To use the Azure AI binding, you must have an [Azure Cognitive Services](https://azure.microsoft.com/en-us/products/cognitive-services/) instance and its access key.
 
-To use the Azure Open AI binding, you must have an [Azure Open AI](https://azure.microsoft.com/en-us/products/cognitive-services/openai-service) instance and its access key.
+To use the Azure Open AI binding, you must have an [Azure Open AI](https://azure.microsoft.com/en-us/products/cognitive-services/openai-service) instance and its access key. This sample also expects that you've deployed two language models to the service, one named `davinci` and the other named `gpt-35`. (The exact models used for those deployments is not as important, but you could use `text-davinci-003  ` and `gpt-35-turbo`, respectively.)
 
 To use the `.http` files to send requests, install the [REST Client](https://marketplace.visualstudio.com/items?itemName=humao.rest-client) VS Code extension.
 
@@ -27,7 +27,6 @@ To use the `.http` files to send requests, install the [REST Client](https://mar
       "azure-ai-endpoint": "https://<name>.cognitiveservices.azure.com",
       "azure-ai-key": "<Azure Cognitive Services key>",
 
-      "azure-open-ai-deployment": "<deployed language model name>"
       "azure-open-ai-endpoint": "https://<name>.openai.azure.com"
       "azure-open-ai-key": "<Azure Open AI API key>"
 
@@ -75,4 +74,11 @@ To use the `.http` files to send requests, install the [REST Client](https://mar
    }
    ```
 
-   > By default, requests will be made to Chat GPT. You can use the query parameter to specify which binding to use, Chat GPT (e.g. `?component=chat-gpt`) or Azure AI (e.g. `?component=azure-ai`) Not all operations (i.e. prompt or summarize) are supported by all bindings.
+   > By default, requests will be made to Open AI's Chat GPT. You can use the query parameter to specify which binding to use:
+   >  - Open AI's Chat GPT (e.g. `?component=open-ai-gpt`)
+   >  - Open AI's Davinci (e.g. `?component=open-ai-davinci`)
+   >  - Azure Open AI Davinci (e.g. `?component=azure-open-ai-davinci`)
+   >  - Azure Open AI Chat GPT (e.g. `?component=azure-open-ai-gpt`)
+   >  - Azure AI (e.g. `?component=azure-ai`)
+   >
+   > Not all operations (i.e. prompt or summarize) are supported by all bindings.

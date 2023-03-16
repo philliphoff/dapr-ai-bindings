@@ -4,24 +4,24 @@ using DaprAI.Bindings;
 var app = DaprPluggableComponentsApplication.Create();
 
 app.RegisterService(
-    "chat-gpt",
+    "open-ai",
     serviceBuilder =>
     {
-        serviceBuilder.RegisterBinding<ChatGptBindings>();
+        serviceBuilder.RegisterBinding(context => new OpenAIBindings());
     });
 
 app.RegisterService(
     "azure-ai",
     serviceBuilder =>
     {
-        serviceBuilder.RegisterBinding<AzureAIBindings>();
+        serviceBuilder.RegisterBinding(context => new AzureAIBindings());
     });
 
 app.RegisterService(
     "azure-open-ai",
     serviceBuilder =>
     {
-        serviceBuilder.RegisterBinding<AzureOpenAIBindings>();
+        serviceBuilder.RegisterBinding(context => new AzureOpenAIBindings());
     });
 
 app.Run();

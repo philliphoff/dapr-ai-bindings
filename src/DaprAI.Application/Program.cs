@@ -4,9 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 
-const string ChatGpt = "chat-gpt";
-const string AzureAI = "azure-ai";
-const string AzureOpenAI = "azure-open-ai";
+const string ChatGpt = "open-ai-gpt";
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

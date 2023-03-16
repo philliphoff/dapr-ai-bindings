@@ -19,18 +19,27 @@ internal sealed class AzureOpenAIBindings : OpenAIBindingsBase
         }
     }
 
-    protected override Uri GetUrl()
+    protected override void OnAttachHeaders(HttpRequestHeaders headers)
     {
-        return new Uri($"{this.Endpoint}/openai/deployments/{this.azureOpenAIDeployment}/completions?api-version=2022-12-01");
-    }
+        base.OnAttachHeaders(headers);
 
-    protected override void AttachHeaders(HttpRequestHeaders headers)
-    {
         headers.Add("api-key", this.Key);
     }
 
-    protected override CompletionsRequest GetCompletionRequest(PromptRequest promptRequest)
+    protected override async Task<PromptResponse> OnPromptAsync(PromptRequest promptRequest, CancellationToken cancellationToken)
     {
-        return new CompletionsRequest(promptRequest.Prompt);
+        var response = await this.SendRequestAsync<CompletionsRequest, CompletionsResponse>(
+            new CompletionsRequest(promptRequest.Prompt),
+            new Uri($"{this.Endpoint}/openai/deployments/{this.azureOpenAIDeployment}/completions?api-version=2022-12-01"),
+            cancellationToken);
+
+        var text = response.Choices.FirstOrDefault()?.Text;
+
+        if (text == null)
+        {
+            throw new InvalidOperationException("No text was returned.");
+        }
+
+        return new PromptResponse(text);
     }
 }

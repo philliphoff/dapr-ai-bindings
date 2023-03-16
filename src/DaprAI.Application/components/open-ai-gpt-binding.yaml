@@ -1,0 +1,18 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: open-ai-gpt
+spec:
+  type: bindings.open-ai
+  version: v1
+  metadata:
+    - name: endpoint
+      value: https://api.openai.com
+    - name: key
+      secretKeyRef:
+        name: open-api-key
+        key: open-api-key
+    - name: model
+      value: gpt-3.5-turbo
+auth:
+  secretStore: secrets

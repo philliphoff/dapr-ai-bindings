@@ -9,7 +9,30 @@ namespace DaprAI.Bindings;
 
 internal abstract class OpenAIBindingsBase : IOutputBinding
 {
-    private static readonly HttpClient HttpClient = new();
+    private sealed class HeadersProcessingHandler : MessageProcessingHandler
+    {
+        private readonly Action<HttpRequestHeaders> headers;
+
+        public HeadersProcessingHandler(Action<HttpRequestHeaders> headers, HttpMessageHandler? innerHandler = null)
+            : base(innerHandler ?? new HttpClientHandler())
+        {
+            this.headers = headers;
+        }
+
+        protected override HttpRequestMessage ProcessRequest(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            this.headers(request.Headers);
+
+            return request;
+        }
+
+        protected override HttpResponseMessage ProcessResponse(HttpResponseMessage response, CancellationToken cancellationToken)
+        {
+            return response;
+        }
+    }
+
+    private readonly HttpClient httpClient;
 
     private string? azureOpenAIEndpoint;
     private string? azureOpenAIKey;
@@ -17,6 +40,11 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
     protected string? Endpoint => this.azureOpenAIEndpoint;
 
     protected string? Key => this.azureOpenAIKey;
+
+    protected OpenAIBindingsBase()
+    {
+        this.httpClient = new HttpClient(new HeadersProcessingHandler(this.OnAttachHeaders));
+    }
 
     #region IOutputBinding Members
 
@@ -56,43 +84,46 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
         return Task.CompletedTask;
     }
 
-    protected abstract Uri GetUrl();
-    protected abstract void AttachHeaders(HttpRequestHeaders headers);
-    protected abstract CompletionsRequest GetCompletionRequest(PromptRequest promptRequest);
+    protected abstract Task<PromptResponse> OnPromptAsync(PromptRequest promptRequest, CancellationToken cancellationToken);
+    
+    protected virtual void OnAttachHeaders(HttpRequestHeaders headers)
+    {
+    }
+
+    protected async Task<TResponse> SendRequestAsync<TRequest, TResponse>(TRequest request, Uri url, CancellationToken cancellationToken)
+    {
+        var message = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = new StringContent(
+                JsonSerializer.Serialize(request),
+                Encoding.UTF8,
+                "application/json")
+        };
+
+        var response = await httpClient.SendAsync(message, cancellationToken);
+
+        response.EnsureSuccessStatusCode();
+
+        var promptResponse = await response.Content.ReadFromJsonAsync<TResponse>(cancellationToken: cancellationToken);
+
+        if (promptResponse == null)
+        {
+            throw new InvalidOperationException("No response returned from completion.");
+        }
+
+        return promptResponse;
+    }
 
     private async Task<OutputBindingInvokeResponse> PromptAsync(OutputBindingInvokeRequest request, CancellationToken cancellationToken)
     {
         var promptRequest = PromptRequest.FromBytes(request.Data.Span);
 
-        var message = new HttpRequestMessage(HttpMethod.Post, this.GetUrl())
-        {
-            Content = new StringContent(
-                JsonSerializer.Serialize(this.GetCompletionRequest(promptRequest)),
-                Encoding.UTF8,
-                "application/json")
-        };
+        var promptResponse = await this.OnPromptAsync(promptRequest, cancellationToken);
 
-        this.AttachHeaders(message.Headers);
-
-        var response = await HttpClient.SendAsync(message, cancellationToken);
-
-        response.EnsureSuccessStatusCode();
-
-        var promptResponse = await response.Content.ReadFromJsonAsync<CompletionsResponse>(cancellationToken: cancellationToken);
-
-        string? text = promptResponse?.Choices.FirstOrDefault()?.Text;
-
-        if (String.IsNullOrEmpty(text))
-        {
-            throw new InvalidOperationException("No text returned from completion.");
-        }
-
-        return new OutputBindingInvokeResponse { Data = new PromptResponse(String.Join(' ', text)).ToBytes() };
+        return new OutputBindingInvokeResponse { Data = promptResponse.ToBytes() };
     }
 
-    protected sealed record CompletionsRequest(
-        [property: JsonPropertyName("prompt")]
-        string Prompt)
+    protected abstract record CompletionsRequestBase
     {
         [JsonPropertyName("model")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -119,11 +150,23 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
         public decimal? PresencePenalty { get; init; }
     }
 
-    protected sealed record CompletionsResponseChoice
-    {
-        [JsonPropertyName("text")]
-        public string? Text { get; init; }
+    protected sealed record CompletionsRequest(
+        [property: JsonPropertyName("prompt")]
+        string Prompt) : CompletionsRequestBase;
 
+    protected sealed record ChatCompletionsRequest(
+        [property: JsonPropertyName("messages")]
+        ChatCompletionMessage[] Messages) : CompletionsRequestBase;
+
+    protected sealed record ChatCompletionMessage(
+        [property: JsonPropertyName("role")]
+        string Role,
+
+        [property: JsonPropertyName("content")]
+        string Content);
+
+    protected abstract record CompletionsResponseChoiceBase
+    {
         [JsonPropertyName("index")]
         public int? Index { get; init; }
 
@@ -132,6 +175,27 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
 
         [JsonPropertyName("logprobs")]
         public string? Logprobs { get; init; }
+    }
+
+    protected sealed record CompletionsResponseChoice : CompletionsResponseChoiceBase
+    {
+        [JsonPropertyName("text")]
+        public string? Text { get; init; }
+    }
+
+    protected sealed record ChatCompletionsResponseChoice : CompletionsResponseChoiceBase
+    {
+        [JsonPropertyName("message")]
+        public ChatCompletionsResponseMessage? Message { get; init; }
+    }
+
+    protected sealed record ChatCompletionsResponseMessage
+    {
+        [JsonPropertyName("content")]
+        public string? Content { get; init; }
+
+        [JsonPropertyName("role")]
+        public string? Role { get; init; }
     }
 
     protected sealed record CompletionsResponseUsage
@@ -146,7 +210,7 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
         public int? TotalTokens { get; init; }
     }
 
-    protected sealed record CompletionsResponse
+    protected sealed record CompletionsResponseBase
     {
         [JsonPropertyName("id")]
         public string? Id { get; init; }
@@ -160,10 +224,19 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
         [JsonPropertyName("model")]
         public string? Model { get; init; }
 
-        [JsonPropertyName("choices")]
-        public CompletionsResponseChoice[] Choices { get; init; } = Array.Empty<CompletionsResponseChoice>();
-
         [JsonPropertyName("usage")]
         public CompletionsResponseUsage? Usage  { get; init; }
+    }
+
+    protected sealed record CompletionsResponse : CompletionsRequestBase
+    {
+        [JsonPropertyName("choices")]
+        public CompletionsResponseChoice[] Choices { get; init; } = Array.Empty<CompletionsResponseChoice>();
+    }
+
+    protected sealed record ChatCompletionsResponse : CompletionsRequestBase
+    {
+        [JsonPropertyName("choices")]
+        public ChatCompletionsResponseChoice[] Choices { get; init; } = Array.Empty<ChatCompletionsResponseChoice>();
     }
 }
