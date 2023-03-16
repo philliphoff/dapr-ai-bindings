@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 
 namespace DaprAI;
 
-public sealed record PromptResponse(
+public sealed record DaprCompletionResponse(
     [property: JsonPropertyName("response")]
     string Response)
 {

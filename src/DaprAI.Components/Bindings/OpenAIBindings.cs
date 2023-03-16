@@ -37,19 +37,22 @@ internal sealed class OpenAIBindings : OpenAIBindingsBase
         headers.Authorization = new AuthenticationHeaderValue("Bearer", this.Key);
     }
 
-    protected override async Task<PromptResponse> OnPromptAsync(PromptRequest promptRequest, CancellationToken cancellationToken)
+    protected override async Task<DaprCompletionResponse> OnPromptAsync(DaprCompletionRequest promptRequest, CancellationToken cancellationToken)
     {
         if (this.IsChatCompletion())
         {
+            var userMessage = new ChatCompletionMessage("user", promptRequest.Prompt);
+
             var response = await this.SendRequestAsync<ChatCompletionsRequest, ChatCompletionsResponse>(
-                new ChatCompletionsRequest(new[] { new ChatCompletionMessage("user", promptRequest.Prompt) })
+                new ChatCompletionsRequest(
+                    !String.IsNullOrEmpty(promptRequest.System)
+                        ? new[] { new ChatCompletionMessage("system", promptRequest.System), userMessage }
+                        : new[] { userMessage })
                 {
                     Model = this.model,
-                    Temperature = 0.9m,
-                    MaxTokens = 64,
-                    TopP = 1.0m,
-                    FrequencyPenalty = 0.0m,
-                    PresencePenalty = 0.0m
+                    Temperature = this.Temperature,
+                    MaxTokens = this.MaxTokens,
+                    TopP = this.TopP,
                 },
                 new Uri($"{this.Endpoint}/v1/chat/completions"),
                 cancellationToken);
@@ -61,7 +64,7 @@ internal sealed class OpenAIBindings : OpenAIBindingsBase
                 throw new InvalidOperationException("No chat content was returned.");
             }
 
-            return new PromptResponse(content);
+            return new DaprCompletionResponse(content);
         }
         else
         {
@@ -69,11 +72,9 @@ internal sealed class OpenAIBindings : OpenAIBindingsBase
                 new CompletionsRequest(promptRequest.Prompt)
                 {
                     Model = this.model,
-                    Temperature = 0.9m,
-                    MaxTokens = 64,
-                    TopP = 1.0m,
-                    FrequencyPenalty = 0.0m,
-                    PresencePenalty = 0.0m
+                    Temperature = this.Temperature,
+                    MaxTokens = this.MaxTokens,
+                    TopP = this.TopP
                 },
                 new Uri($"{this.Endpoint}/v1/completions"),
                 cancellationToken);
@@ -85,7 +86,7 @@ internal sealed class OpenAIBindings : OpenAIBindingsBase
                 throw new InvalidOperationException("No text was returned.");
             }
 
-            return new PromptResponse(text);
+            return new DaprCompletionResponse(text);
         }
     }
 

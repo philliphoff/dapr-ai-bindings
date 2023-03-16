@@ -22,12 +22,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapPost(
-    "/prompt",
-    async ([FromQuery] string? component, [FromBody] PromptRequest request, [FromServices] DaprClient daprClient) =>
+    "/complete",
+    async ([FromQuery] string? component, [FromBody] DaprCompletionRequest request, [FromServices] DaprClient daprClient) =>
     {
         component ??= ChatGpt;
 
-        var response = await daprClient.PromptAIAsync(component, request);
+        var response = await daprClient.CompleteTextAsync(component, request);
 
         return response;
     })
@@ -36,11 +36,11 @@ app.MapPost(
 
 app.MapPost(
     "/summarize",
-    async ([FromQuery] string? component, [FromBody] PromptRequest request, [FromServices] DaprClient daprClient) =>
+    async ([FromQuery] string? component, [FromBody] DaprCompletionRequest request, [FromServices] DaprClient daprClient) =>
     {
         component ??= ChatGpt;
 
-        var response = await daprClient.SummarizeAIAsync(component, request);
+        var response = await daprClient.SummarizeTextAsync(component, request);
 
         return response;
     })

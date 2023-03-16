@@ -32,19 +32,25 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
         }
     }
 
-    private readonly HttpClient httpClient;
+    protected HttpClient HttpClient { get; private set; }
 
     private string? azureOpenAIEndpoint;
     private string? azureOpenAIKey;
+
+    protected OpenAIBindingsBase()
+    {
+        this.HttpClient = new HttpClient(new HeadersProcessingHandler(this.OnAttachHeaders));
+    }
 
     protected string? Endpoint => this.azureOpenAIEndpoint;
 
     protected string? Key => this.azureOpenAIKey;
 
-    protected OpenAIBindingsBase()
-    {
-        this.httpClient = new HttpClient(new HeadersProcessingHandler(this.OnAttachHeaders));
-    }
+    protected int? MaxTokens { get; private set; }
+
+    protected decimal? Temperature { get; private set; }
+
+    protected decimal? TopP { get; private set; }
 
     #region IOutputBinding Members
 
@@ -57,14 +63,14 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
     {
         return request.Operation switch
         {
-            "prompt" => this.PromptAsync(request, cancellationToken),
+            Constants.Operations.CompleteText => this.PromptAsync(request, cancellationToken),
             _ => throw new NotImplementedException(),
         };
     }
 
     public Task<string[]> ListOperationsAsync(CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(new[] { "prompt" });
+        return Task.FromResult(new[] { Constants.Operations.CompleteText });
     }
 
     #endregion
@@ -81,10 +87,25 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
             throw new InvalidOperationException("Missing required metadata property 'key'.");
         }
 
+        if (request.Properties.TryGetValue("maxTokens", out var maxTokens))
+        {
+            this.MaxTokens = Int32.Parse(maxTokens);
+        }
+
+        if (request.Properties.TryGetValue("temperature", out var temperature))
+        {
+            this.Temperature = Decimal.Parse(temperature);
+        }
+
+        if (request.Properties.TryGetValue("topP", out var topP))
+        {
+            this.TopP = Decimal.Parse(topP);
+        }
+
         return Task.CompletedTask;
     }
 
-    protected abstract Task<PromptResponse> OnPromptAsync(PromptRequest promptRequest, CancellationToken cancellationToken);
+    protected abstract Task<DaprCompletionResponse> OnPromptAsync(DaprCompletionRequest promptRequest, CancellationToken cancellationToken);
     
     protected virtual void OnAttachHeaders(HttpRequestHeaders headers)
     {
@@ -100,7 +121,7 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
                 "application/json")
         };
 
-        var response = await httpClient.SendAsync(message, cancellationToken);
+        var response = await this.HttpClient.SendAsync(message, cancellationToken);
 
         response.EnsureSuccessStatusCode();
 
@@ -116,7 +137,7 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
 
     private async Task<OutputBindingInvokeResponse> PromptAsync(OutputBindingInvokeRequest request, CancellationToken cancellationToken)
     {
-        var promptRequest = PromptRequest.FromBytes(request.Data.Span);
+        var promptRequest = DaprCompletionRequest.FromBytes(request.Data.Span);
 
         var promptResponse = await this.OnPromptAsync(promptRequest, cancellationToken);
 
@@ -148,6 +169,10 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
         [JsonPropertyName("presence_penalty")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public decimal? PresencePenalty { get; init; }
+
+        [JsonPropertyName("stop")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string[]? Stop { get; init; }
     }
 
     protected sealed record CompletionsRequest(

@@ -4,14 +4,18 @@ using System.Text.Json.Serialization;
 
 namespace DaprAI;
 
-public sealed record PromptRequest(
+public sealed record DaprCompletionRequest(
     [property: JsonPropertyName("prompt")]
     string Prompt)
 {
-    public static PromptRequest FromBytes(ReadOnlySpan<byte> bytes)
+    [JsonPropertyName("system")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? System { get; init; }
+
+    public static DaprCompletionRequest FromBytes(ReadOnlySpan<byte> bytes)
     {
         var requestJson = Encoding.UTF8.GetString(bytes);
-        var request = JsonSerializer.Deserialize<PromptRequest>(requestJson);
+        var request = JsonSerializer.Deserialize<DaprCompletionRequest>(requestJson);
 
         if (request is null)
         {
