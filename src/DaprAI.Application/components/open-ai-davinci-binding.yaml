@@ -1,18 +1,18 @@
 apiVersion: dapr.io/v1alpha1
 kind: Component
 metadata:
-  name: chat-gpt
+  name: open-ai-davinci
 spec:
-  type: bindings.chat-gpt
+  type: bindings.open-ai
   version: v1
   metadata:
     - name: endpoint
-      secretKeyRef:
-        name: open-api-endpoint
-        key: open-api-endpoint
+      value: https://api.openai.com
     - name: key
       secretKeyRef:
         name: open-api-key
         key: open-api-key
+    - name: model
+      value: text-davinci-003
 auth:
   secretStore: secrets
