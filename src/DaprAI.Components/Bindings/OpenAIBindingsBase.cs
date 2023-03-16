@@ -37,14 +37,20 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
     private string? azureOpenAIEndpoint;
     private string? azureOpenAIKey;
 
-    protected string? Endpoint => this.azureOpenAIEndpoint;
-
-    protected string? Key => this.azureOpenAIKey;
-
     protected OpenAIBindingsBase()
     {
         this.HttpClient = new HttpClient(new HeadersProcessingHandler(this.OnAttachHeaders));
     }
+
+    protected string? Endpoint => this.azureOpenAIEndpoint;
+
+    protected string? Key => this.azureOpenAIKey;
+
+    protected int? MaxTokens { get; private set; }
+
+    protected decimal? Temperature { get; private set; }
+
+    protected decimal? TopP { get; private set; }
 
     #region IOutputBinding Members
 
@@ -79,6 +85,21 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
         if (!request.Properties.TryGetValue("key", out this.azureOpenAIKey))
         {
             throw new InvalidOperationException("Missing required metadata property 'key'.");
+        }
+
+        if (request.Properties.TryGetValue("maxTokens", out var maxTokens))
+        {
+            this.MaxTokens = Int32.Parse(maxTokens);
+        }
+
+        if (request.Properties.TryGetValue("temperature", out var temperature))
+        {
+            this.Temperature = Decimal.Parse(temperature);
+        }
+
+        if (request.Properties.TryGetValue("topP", out var topP))
+        {
+            this.TopP = Decimal.Parse(topP);
         }
 
         return Task.CompletedTask;

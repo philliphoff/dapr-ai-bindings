@@ -16,5 +16,11 @@ spec:
       secretKeyRef:
         name: azure-open-ai-key
         key: azure-open-ai-key
+    - name: maxTokens
+      value: 64
+    - name: temperature
+      value: 0.9
+    - name: topP
+      value: 1.0
 auth:
   secretStore: secrets

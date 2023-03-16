@@ -14,5 +14,11 @@ spec:
         key: open-api-key
     - name: model
       value: gpt-3.5-turbo
+    - name: maxTokens
+      value: 64
+    - name: temperature
+      value: 0.9
+    - name: topP
+      value: 1.0
 auth:
   secretStore: secrets

@@ -46,7 +46,7 @@ internal sealed class AzureOpenAIBindings : OpenAIBindingsBase
         {
             string system = promptRequest.System != null ? $"<|im_start|>system\n{promptRequest.System}\n<|im_end|>\n" : String.Empty;
             string user = $"<|im_start|>user\n{promptRequest.Prompt}\n<|im_end|>\n";
-            string prompt = $"{system}{user}<|im_start|>assistant";
+            string prompt = $"{system}{user}<|im_start|>assistant\n";
 
             azureRequest = new CompletionsRequest(prompt)
             {
@@ -57,6 +57,13 @@ internal sealed class AzureOpenAIBindings : OpenAIBindingsBase
         {
             azureRequest = new CompletionsRequest(promptRequest.Prompt);
         }
+
+        azureRequest = azureRequest with
+            {
+                MaxTokens = this.MaxTokens,
+                Temperature = this.Temperature,
+                TopP = this.TopP
+            };
 
         var response = await this.SendRequestAsync<CompletionsRequest, CompletionsResponse>(
             azureRequest,

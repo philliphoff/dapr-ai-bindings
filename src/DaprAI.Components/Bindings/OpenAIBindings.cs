@@ -50,11 +50,9 @@ internal sealed class OpenAIBindings : OpenAIBindingsBase
                         : new[] { userMessage })
                 {
                     Model = this.model,
-                    Temperature = 0.9m,
-                    MaxTokens = 64,
-                    TopP = 1.0m,
-                    FrequencyPenalty = 0.0m,
-                    PresencePenalty = 0.0m
+                    Temperature = this.Temperature,
+                    MaxTokens = this.MaxTokens,
+                    TopP = this.TopP,
                 },
                 new Uri($"{this.Endpoint}/v1/chat/completions"),
                 cancellationToken);
@@ -74,11 +72,9 @@ internal sealed class OpenAIBindings : OpenAIBindingsBase
                 new CompletionsRequest(promptRequest.Prompt)
                 {
                     Model = this.model,
-                    Temperature = 0.9m,
-                    MaxTokens = 64,
-                    TopP = 1.0m,
-                    FrequencyPenalty = 0.0m,
-                    PresencePenalty = 0.0m
+                    Temperature = this.Temperature,
+                    MaxTokens = this.MaxTokens,
+                    TopP = this.TopP
                 },
                 new Uri($"{this.Endpoint}/v1/completions"),
                 cancellationToken);
