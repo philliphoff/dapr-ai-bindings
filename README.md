@@ -51,7 +51,7 @@ To use the `.http` files to send requests, install the [REST Client](https://mar
 1. Send a prompt request:
 
    ```http
-   POST http://localhost:5111/prompt HTTP/1.1
+   POST http://localhost:5111/complete HTTP/1.1
    content-type: application/json
 
    {

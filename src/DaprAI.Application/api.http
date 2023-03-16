@@ -1,4 +1,4 @@
-POST http://localhost:5111/prompt HTTP/1.1
+POST http://localhost:5111/complete HTTP/1.1
 content-type: application/json
 
 {

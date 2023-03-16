@@ -37,7 +37,7 @@ internal sealed class OpenAIBindings : OpenAIBindingsBase
         headers.Authorization = new AuthenticationHeaderValue("Bearer", this.Key);
     }
 
-    protected override async Task<PromptResponse> OnPromptAsync(PromptRequest promptRequest, CancellationToken cancellationToken)
+    protected override async Task<DaprCompletionResponse> OnPromptAsync(DaprCompletionRequest promptRequest, CancellationToken cancellationToken)
     {
         if (this.IsChatCompletion())
         {
@@ -61,7 +61,7 @@ internal sealed class OpenAIBindings : OpenAIBindingsBase
                 throw new InvalidOperationException("No chat content was returned.");
             }
 
-            return new PromptResponse(content);
+            return new DaprCompletionResponse(content);
         }
         else
         {
@@ -85,7 +85,7 @@ internal sealed class OpenAIBindings : OpenAIBindingsBase
                 throw new InvalidOperationException("No text was returned.");
             }
 
-            return new PromptResponse(text);
+            return new DaprCompletionResponse(text);
         }
     }
 

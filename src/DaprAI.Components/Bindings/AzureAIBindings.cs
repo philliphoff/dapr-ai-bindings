@@ -25,14 +25,14 @@ internal sealed class AzureAIBindings : IOutputBinding
     {
         return request.Operation switch
         {
-            "summarize" => this.SummarizeAsync(request, cancellationToken),
+            Constants.Operations.SummarizeText => this.SummarizeAsync(request, cancellationToken),
             _ => throw new NotImplementedException(),
         };
     }
 
     public Task<string[]> ListOperationsAsync(CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(new[] { "summarize" });
+        return Task.FromResult(new[] { Constants.Operations.SummarizeText });
     }
 
     #endregion
@@ -42,7 +42,7 @@ internal sealed class AzureAIBindings : IOutputBinding
         var credentials = new AzureKeyCredential(this.azureAIKey!);
         var client = new TextAnalyticsClient(new Uri(this.azureAIEndpoint!), credentials);
 
-        var summarizeRequest = PromptRequest.FromBytes(request.Data.Span);
+        var summarizeRequest = DaprCompletionRequest.FromBytes(request.Data.Span);
 
         var operation = await client.StartAnalyzeActionsAsync(
             new[]
@@ -82,6 +82,6 @@ internal sealed class AzureAIBindings : IOutputBinding
             }
         }
 
-        return new OutputBindingInvokeResponse { Data = new PromptResponse(String.Join(' ', sentences)).ToBytes() };
+        return new OutputBindingInvokeResponse { Data = new DaprCompletionResponse(String.Join(' ', sentences)).ToBytes() };
     }
 }

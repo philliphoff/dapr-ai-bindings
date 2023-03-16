@@ -57,14 +57,14 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
     {
         return request.Operation switch
         {
-            "prompt" => this.PromptAsync(request, cancellationToken),
+            Constants.Operations.CompleteText => this.PromptAsync(request, cancellationToken),
             _ => throw new NotImplementedException(),
         };
     }
 
     public Task<string[]> ListOperationsAsync(CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(new[] { "prompt" });
+        return Task.FromResult(new[] { Constants.Operations.CompleteText });
     }
 
     #endregion
@@ -84,7 +84,7 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
         return Task.CompletedTask;
     }
 
-    protected abstract Task<PromptResponse> OnPromptAsync(PromptRequest promptRequest, CancellationToken cancellationToken);
+    protected abstract Task<DaprCompletionResponse> OnPromptAsync(DaprCompletionRequest promptRequest, CancellationToken cancellationToken);
     
     protected virtual void OnAttachHeaders(HttpRequestHeaders headers)
     {
@@ -116,7 +116,7 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
 
     private async Task<OutputBindingInvokeResponse> PromptAsync(OutputBindingInvokeRequest request, CancellationToken cancellationToken)
     {
-        var promptRequest = PromptRequest.FromBytes(request.Data.Span);
+        var promptRequest = DaprCompletionRequest.FromBytes(request.Data.Span);
 
         var promptResponse = await this.OnPromptAsync(promptRequest, cancellationToken);
 

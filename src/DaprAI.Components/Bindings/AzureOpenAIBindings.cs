@@ -26,7 +26,7 @@ internal sealed class AzureOpenAIBindings : OpenAIBindingsBase
         headers.Add("api-key", this.Key);
     }
 
-    protected override async Task<PromptResponse> OnPromptAsync(PromptRequest promptRequest, CancellationToken cancellationToken)
+    protected override async Task<DaprCompletionResponse> OnPromptAsync(DaprCompletionRequest promptRequest, CancellationToken cancellationToken)
     {
         var response = await this.SendRequestAsync<CompletionsRequest, CompletionsResponse>(
             new CompletionsRequest(promptRequest.Prompt),
@@ -40,6 +40,6 @@ internal sealed class AzureOpenAIBindings : OpenAIBindingsBase
             throw new InvalidOperationException("No text was returned.");
         }
 
-        return new PromptResponse(text);
+        return new DaprCompletionResponse(text);
     }
 }

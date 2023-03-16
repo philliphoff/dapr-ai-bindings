@@ -4,9 +4,9 @@ namespace DaprAI;
 
 internal static class DaprClientExtensions
 {
-    public static Task<PromptResponse> PromptAIAsync(this DaprClient daprClient, string component, PromptRequest request) =>
-        daprClient.InvokeBindingAsync<PromptRequest, PromptResponse>(component, "prompt", request);
+    public static Task<DaprCompletionResponse> CompleteTextAsync(this DaprClient daprClient, string component, DaprCompletionRequest request) =>
+        daprClient.InvokeBindingAsync<DaprCompletionRequest, DaprCompletionResponse>(component, Constants.Operations.CompleteText, request);
 
-    public static Task<PromptResponse> SummarizeAIAsync(this DaprClient daprClient, string component, PromptRequest request) =>
-        daprClient.InvokeBindingAsync<PromptRequest, PromptResponse>(component, "summarize", request);
+    public static Task<DaprCompletionResponse> SummarizeTextAsync(this DaprClient daprClient, string component, DaprCompletionRequest request) =>
+        daprClient.InvokeBindingAsync<DaprCompletionRequest, DaprCompletionResponse>(component, Constants.Operations.SummarizeText, request);
 }
