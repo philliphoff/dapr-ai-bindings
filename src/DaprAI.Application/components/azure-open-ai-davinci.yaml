@@ -1,0 +1,20 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: azure-open-ai-davinci
+spec:
+  type: bindings.azure-open-ai
+  version: v1
+  metadata:
+    - name: deployment
+      value: davinci
+    - name: endpoint
+      secretKeyRef:
+        name: azure-open-ai-endpoint
+        key: azure-open-ai-endpoint
+    - name: key
+      secretKeyRef:
+        name: azure-open-ai-key
+        key: azure-open-ai-key
+auth:
+  secretStore: secrets

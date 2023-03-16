@@ -1,15 +1,13 @@
 apiVersion: dapr.io/v1alpha1
 kind: Component
 metadata:
-  name: azure-open-ai
+  name: azure-open-ai-gpt
 spec:
   type: bindings.azure-open-ai
   version: v1
   metadata:
     - name: deployment
-      secretKeyRef:
-        name: azure-open-ai-deployment
-        key: azure-open-ai-deployment
+      value: gpt-35
     - name: endpoint
       secretKeyRef:
         name: azure-open-ai-endpoint
