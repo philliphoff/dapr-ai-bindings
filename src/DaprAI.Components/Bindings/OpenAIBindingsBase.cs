@@ -32,7 +32,7 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
         }
     }
 
-    private readonly HttpClient httpClient;
+    protected HttpClient HttpClient { get; private set; }
 
     private string? azureOpenAIEndpoint;
     private string? azureOpenAIKey;
@@ -43,7 +43,7 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
 
     protected OpenAIBindingsBase()
     {
-        this.httpClient = new HttpClient(new HeadersProcessingHandler(this.OnAttachHeaders));
+        this.HttpClient = new HttpClient(new HeadersProcessingHandler(this.OnAttachHeaders));
     }
 
     #region IOutputBinding Members
@@ -100,7 +100,7 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
                 "application/json")
         };
 
-        var response = await httpClient.SendAsync(message, cancellationToken);
+        var response = await this.HttpClient.SendAsync(message, cancellationToken);
 
         response.EnsureSuccessStatusCode();
 
@@ -148,6 +148,10 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
         [JsonPropertyName("presence_penalty")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public decimal? PresencePenalty { get; init; }
+
+        [JsonPropertyName("stop")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string[]? Stop { get; init; }
     }
 
     protected sealed record CompletionsRequest(

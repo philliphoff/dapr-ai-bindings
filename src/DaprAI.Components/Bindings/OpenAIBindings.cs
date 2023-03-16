@@ -41,8 +41,13 @@ internal sealed class OpenAIBindings : OpenAIBindingsBase
     {
         if (this.IsChatCompletion())
         {
+            var userMessage = new ChatCompletionMessage("user", promptRequest.Prompt);
+
             var response = await this.SendRequestAsync<ChatCompletionsRequest, ChatCompletionsResponse>(
-                new ChatCompletionsRequest(new[] { new ChatCompletionMessage("user", promptRequest.Prompt) })
+                new ChatCompletionsRequest(
+                    !String.IsNullOrEmpty(promptRequest.System)
+                        ? new[] { new ChatCompletionMessage("system", promptRequest.System), userMessage }
+                        : new[] { userMessage })
                 {
                     Model = this.model,
                     Temperature = 0.9m,
