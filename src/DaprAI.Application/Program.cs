@@ -36,7 +36,7 @@ app.MapPost(
 
 app.MapPost(
     "/summarize",
-    async ([FromQuery] string? component, [FromBody] DaprCompletionRequest request, [FromServices] DaprClient daprClient) =>
+    async ([FromQuery] string? component, [FromBody] DaprSummarizationRequest request, [FromServices] DaprClient daprClient) =>
     {
         component ??= ChatGpt;
 

@@ -11,17 +11,4 @@ public sealed record DaprCompletionRequest(
     [JsonPropertyName("system")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? System { get; init; }
-
-    public static DaprCompletionRequest FromBytes(ReadOnlySpan<byte> bytes)
-    {
-        var requestJson = Encoding.UTF8.GetString(bytes);
-        var request = JsonSerializer.Deserialize<DaprCompletionRequest>(requestJson);
-
-        if (request is null)
-        {
-            throw new InvalidOperationException("Unable to deserialize request.");
-        }
-
-        return request;
-    }
 }

@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Dapr.PluggableComponents.Components;
 using Dapr.PluggableComponents.Components.Bindings;
+using DaprAI.Utilities;
 
 namespace DaprAI.Bindings;
 
@@ -64,13 +65,14 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
         return request.Operation switch
         {
             Constants.Operations.CompleteText => this.PromptAsync(request, cancellationToken),
+            Constants.Operations.SummarizeText => this.SummarizeAsync(request, cancellationToken),
             _ => throw new NotImplementedException(),
         };
     }
 
     public Task<string[]> ListOperationsAsync(CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(new[] { Constants.Operations.CompleteText });
+        return Task.FromResult(new[] { Constants.Operations.CompleteText, Constants.Operations.SummarizeText });
     }
 
     #endregion
@@ -106,6 +108,7 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
     }
 
     protected abstract Task<DaprCompletionResponse> OnPromptAsync(DaprCompletionRequest promptRequest, CancellationToken cancellationToken);
+    protected abstract Task<DaprSummarizationResponse> OnSummarizeAsync(DaprSummarizationRequest summarizeRequest, CancellationToken cancellationToken);
     
     protected virtual void OnAttachHeaders(HttpRequestHeaders headers)
     {
@@ -137,11 +140,20 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
 
     private async Task<OutputBindingInvokeResponse> PromptAsync(OutputBindingInvokeRequest request, CancellationToken cancellationToken)
     {
-        var promptRequest = DaprCompletionRequest.FromBytes(request.Data.Span);
+        var completionRequest = SerializationUtilities.FromBytes<DaprCompletionRequest>(request.Data.Span);
 
-        var promptResponse = await this.OnPromptAsync(promptRequest, cancellationToken);
+        var completionResponse = await this.OnPromptAsync(completionRequest, cancellationToken);
 
-        return new OutputBindingInvokeResponse { Data = promptResponse.ToBytes() };
+        return new OutputBindingInvokeResponse { Data = SerializationUtilities.ToBytes(completionResponse) };
+    }
+
+    private async Task<OutputBindingInvokeResponse> SummarizeAsync(OutputBindingInvokeRequest request, CancellationToken cancellationToken)
+    {
+        var summarizationRequest = SerializationUtilities.FromBytes<DaprSummarizationRequest>(request.Data.Span);
+
+        var summarizationResponse = await this.OnSummarizeAsync(summarizationRequest, cancellationToken);
+
+        return new OutputBindingInvokeResponse { Data = SerializationUtilities.ToBytes(summarizationResponse) };
     }
 
     protected abstract record CompletionsRequestBase

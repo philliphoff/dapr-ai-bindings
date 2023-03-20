@@ -1,8 +1,8 @@
-using System.Text;
 using Azure;
 using Azure.AI.TextAnalytics;
 using Dapr.PluggableComponents.Components;
 using Dapr.PluggableComponents.Components.Bindings;
+using DaprAI.Utilities;
 
 namespace DaprAI.Bindings;
 
@@ -42,12 +42,14 @@ internal sealed class AzureAIBindings : IOutputBinding
         var credentials = new AzureKeyCredential(this.azureAIKey!);
         var client = new TextAnalyticsClient(new Uri(this.azureAIEndpoint!), credentials);
 
-        var summarizeRequest = DaprCompletionRequest.FromBytes(request.Data.Span);
+        var summarizationRequest = SerializationUtilities.FromBytes<DaprSummarizationRequest>(request.Data.Span);
+
+        string documentText = await SummarizationUtilities.GetDocumentText(summarizationRequest, cancellationToken);
 
         var operation = await client.StartAnalyzeActionsAsync(
             new[]
             {
-                summarizeRequest.Prompt
+                documentText
             },
             new TextAnalyticsActions
             {
@@ -82,6 +84,8 @@ internal sealed class AzureAIBindings : IOutputBinding
             }
         }
 
-        return new OutputBindingInvokeResponse { Data = new DaprCompletionResponse(String.Join(' ', sentences)).ToBytes() };
+        var summarizationResponse = new DaprSummarizationResponse(String.Join(' ', sentences));
+
+        return new OutputBindingInvokeResponse { Data = SerializationUtilities.ToBytes(summarizationResponse) };
     }
 }

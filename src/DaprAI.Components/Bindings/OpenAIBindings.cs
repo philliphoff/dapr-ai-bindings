@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using Dapr.PluggableComponents.Components;
+using DaprAI.Utilities;
 
 namespace DaprAI.Bindings;
 
@@ -88,6 +89,60 @@ internal sealed class OpenAIBindings : OpenAIBindingsBase
 
             return new DaprCompletionResponse(text);
         }
+    }
+
+    protected override async Task<DaprSummarizationResponse> OnSummarizeAsync(DaprSummarizationRequest promptRequest, CancellationToken cancellationToken)
+    {
+        string documentText = await SummarizationUtilities.GetDocumentText(promptRequest, cancellationToken);
+
+        string? summary;
+
+        if (this.IsChatCompletion())
+        {
+            string systemText = "You are an AI assistant that helps people summarize text and will respond to the user's messages with a summarization of the text of that message.";
+
+            var response = await this.SendRequestAsync<ChatCompletionsRequest, ChatCompletionsResponse>(
+                new ChatCompletionsRequest(
+                    new[]
+                    {
+                        new ChatCompletionMessage("system", systemText),
+                        new ChatCompletionMessage("user", documentText)
+                    })
+                {
+                    Model = this.model,
+                    Temperature = this.Temperature,
+                    MaxTokens = this.MaxTokens,
+                    TopP = this.TopP,
+                },
+                new Uri($"{this.Endpoint}/v1/chat/completions"),
+                cancellationToken);
+
+            summary = response.Choices.FirstOrDefault()?.Message?.Content;
+        }
+        else
+        {
+            string prompt = $"Summarize the following text: {documentText}";
+
+            var response = await this.SendRequestAsync<CompletionsRequest, CompletionsResponse>(
+                new CompletionsRequest(prompt)
+                {
+                    Model = this.model,
+                    Temperature = this.Temperature,
+                    MaxTokens = this.MaxTokens,
+                    TopP = this.TopP
+                },
+                new Uri($"{this.Endpoint}/v1/completions"),
+                cancellationToken);
+
+            summary = response.Choices.FirstOrDefault()?.Text;
+        }
+
+        if (summary == null)
+        {
+            throw new InvalidOperationException("No summary was returned.");
+        }
+
+        return new DaprSummarizationResponse(summary);
     }
 
     protected override async Task OnInitAsync(MetadataRequest request, CancellationToken cancellationToken)

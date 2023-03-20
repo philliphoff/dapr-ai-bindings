@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text.Json.Serialization;
 using Dapr.PluggableComponents.Components;
+using DaprAI.Utilities;
 
 namespace DaprAI.Bindings;
 
@@ -78,6 +79,54 @@ internal sealed class AzureOpenAIBindings : OpenAIBindingsBase
         }
 
         return new DaprCompletionResponse(text);
+    }
+
+    protected override async Task<DaprSummarizationResponse> OnSummarizeAsync(DaprSummarizationRequest promptRequest, CancellationToken cancellationToken)
+    {
+        string documentText = await SummarizationUtilities.GetDocumentText(promptRequest, cancellationToken);
+
+        var isChatCompletion = await this.isChatCompletion.Value;
+
+        CompletionsRequest azureRequest;
+
+        if (isChatCompletion)
+        {
+            string system = $"<|im_start|>system\nou are an AI assistant that helps people summarize text and will respond to the user's messages with a summarization of the text of that message.\n<|im_end|>\n";
+            string user = $"<|im_start|>user\n{documentText}\n<|im_end|>\n";
+            string prompt = $"{system}{user}<|im_start|>assistant\n";
+
+            azureRequest = new CompletionsRequest(prompt)
+            {
+                Stop = new[] { "<|im_end|>" },
+            };
+        }
+        else
+        {
+            string prompt = $"Summarize the following text: {documentText}";
+
+            azureRequest = new CompletionsRequest(prompt);
+        }
+
+        azureRequest = azureRequest with
+            {
+                MaxTokens = this.MaxTokens,
+                Temperature = this.Temperature,
+                TopP = this.TopP
+            };
+
+        var response = await this.SendRequestAsync<CompletionsRequest, CompletionsResponse>(
+            azureRequest,
+            new Uri($"{this.Endpoint}/openai/deployments/{this.azureOpenAIDeployment}/completions?api-version=2022-12-01"),
+            cancellationToken);
+
+        var summary = response.Choices.FirstOrDefault()?.Text;
+
+        if (summary == null)
+        {
+            throw new InvalidOperationException("No summary was returned.");
+        }
+
+        return new DaprSummarizationResponse(summary);
     }
 
     private async Task<bool> IsDeploymentChatCompletionModel()
