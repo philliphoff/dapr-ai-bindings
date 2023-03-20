@@ -35,19 +35,18 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
 
     protected HttpClient HttpClient { get; private set; }
 
-    private string? azureOpenAIEndpoint;
-    private string? azureOpenAIKey;
-
     protected OpenAIBindingsBase()
     {
         this.HttpClient = new HttpClient(new HeadersProcessingHandler(this.OnAttachHeaders));
     }
 
-    protected string? Endpoint => this.azureOpenAIEndpoint;
+    protected string? Endpoint { get; private set; }
 
-    protected string? Key => this.azureOpenAIKey;
+    protected string? Key { get; private set; }
 
     protected int? MaxTokens { get; private set; }
+
+    protected string? SummarizationInstructions { get; private set; }
 
     protected decimal? Temperature { get; private set; }
 
@@ -64,7 +63,7 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
     {
         return request.Operation switch
         {
-            Constants.Operations.CompleteText => this.PromptAsync(request, cancellationToken),
+            Constants.Operations.CompleteText => this.CompleteAsync(request, cancellationToken),
             Constants.Operations.SummarizeText => this.SummarizeAsync(request, cancellationToken),
             _ => throw new NotImplementedException(),
         };
@@ -79,12 +78,20 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
 
     protected virtual Task OnInitAsync(MetadataRequest request, CancellationToken cancellationToken)
     {
-        if (!request.Properties.TryGetValue("endpoint", out this.azureOpenAIEndpoint))
+        if (request.Properties.TryGetValue("endpoint", out var endpoint))
+        {
+            this.Endpoint = endpoint;
+        }
+        else
         {
             throw new InvalidOperationException("Missing required metadata property 'endpoint'.");
         }
         
-        if (!request.Properties.TryGetValue("key", out this.azureOpenAIKey))
+        if (request.Properties.TryGetValue("key", out var key))
+        {
+            this.Key = key;
+        }
+        else 
         {
             throw new InvalidOperationException("Missing required metadata property 'key'.");
         }
@@ -92,6 +99,11 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
         if (request.Properties.TryGetValue("maxTokens", out var maxTokens))
         {
             this.MaxTokens = Int32.Parse(maxTokens);
+        }
+
+        if (request.Properties.TryGetValue("summarizationInstructions", out var summarizationInstructions))
+        {
+            this.SummarizationInstructions = summarizationInstructions;
         }
 
         if (request.Properties.TryGetValue("temperature", out var temperature))
@@ -107,7 +119,7 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
         return Task.CompletedTask;
     }
 
-    protected abstract Task<DaprCompletionResponse> OnPromptAsync(DaprCompletionRequest promptRequest, CancellationToken cancellationToken);
+    protected abstract Task<DaprCompletionResponse> OnCompleteAsync(DaprCompletionRequest completionRequest, CancellationToken cancellationToken);
     protected abstract Task<DaprSummarizationResponse> OnSummarizeAsync(DaprSummarizationRequest summarizeRequest, CancellationToken cancellationToken);
     
     protected virtual void OnAttachHeaders(HttpRequestHeaders headers)
@@ -138,11 +150,11 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
         return promptResponse;
     }
 
-    private async Task<OutputBindingInvokeResponse> PromptAsync(OutputBindingInvokeRequest request, CancellationToken cancellationToken)
+    private async Task<OutputBindingInvokeResponse> CompleteAsync(OutputBindingInvokeRequest request, CancellationToken cancellationToken)
     {
         var completionRequest = SerializationUtilities.FromBytes<DaprCompletionRequest>(request.Data.Span);
 
-        var completionResponse = await this.OnPromptAsync(completionRequest, cancellationToken);
+        var completionResponse = await this.OnCompleteAsync(completionRequest, cancellationToken);
 
         return new OutputBindingInvokeResponse { Data = SerializationUtilities.ToBytes(completionResponse) };
     }

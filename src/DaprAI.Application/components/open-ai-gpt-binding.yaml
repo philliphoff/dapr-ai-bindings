@@ -16,6 +16,8 @@ spec:
       value: gpt-3.5-turbo
     - name: maxTokens
       value: 64
+    - name: summarizationInstructions
+      value: "You are an AI assistant that helps 2nd-graders summarize text. Respond to each user's message with a summarization of that message's text."
     - name: temperature
       value: 0.9
     - name: topP

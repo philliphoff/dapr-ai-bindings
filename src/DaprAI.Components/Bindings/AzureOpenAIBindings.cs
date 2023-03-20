@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text.Json.Serialization;
 using Dapr.PluggableComponents.Components;
@@ -37,7 +38,7 @@ internal sealed class AzureOpenAIBindings : OpenAIBindingsBase
         headers.Add("api-key", this.Key);
     }
 
-    protected override async Task<DaprCompletionResponse> OnPromptAsync(DaprCompletionRequest promptRequest, CancellationToken cancellationToken)
+    protected override async Task<DaprCompletionResponse> OnCompleteAsync(DaprCompletionRequest promptRequest, CancellationToken cancellationToken)
     {
         var isChatCompletion = await this.isChatCompletion.Value;
 
@@ -81,9 +82,14 @@ internal sealed class AzureOpenAIBindings : OpenAIBindingsBase
         return new DaprCompletionResponse(text);
     }
 
-    protected override async Task<DaprSummarizationResponse> OnSummarizeAsync(DaprSummarizationRequest promptRequest, CancellationToken cancellationToken)
+    protected override async Task<DaprSummarizationResponse> OnSummarizeAsync(DaprSummarizationRequest summarizationRequest, CancellationToken cancellationToken)
     {
-        string documentText = await SummarizationUtilities.GetDocumentText(promptRequest, cancellationToken);
+        string documentText = await SummarizationUtilities.GetDocumentText(summarizationRequest, cancellationToken);
+
+        string summarizationInstructions = String.Format(
+            CultureInfo.CurrentCulture,
+            this.SummarizationInstructions ?? throw new InvalidOperationException("Missing required metadata property 'summarizationInstructions'."),
+            documentText);
 
         var isChatCompletion = await this.isChatCompletion.Value;
 
@@ -91,7 +97,7 @@ internal sealed class AzureOpenAIBindings : OpenAIBindingsBase
 
         if (isChatCompletion)
         {
-            string system = $"<|im_start|>system\nou are an AI assistant that helps people summarize text and will respond to the user's messages with a summarization of the text of that message.\n<|im_end|>\n";
+            string system = $"<|im_start|>system\n{summarizationInstructions}\n<|im_end|>\n";
             string user = $"<|im_start|>user\n{documentText}\n<|im_end|>\n";
             string prompt = $"{system}{user}<|im_start|>assistant\n";
 
@@ -102,9 +108,7 @@ internal sealed class AzureOpenAIBindings : OpenAIBindingsBase
         }
         else
         {
-            string prompt = $"Summarize the following text: {documentText}";
-
-            azureRequest = new CompletionsRequest(prompt);
+            azureRequest = new CompletionsRequest(summarizationInstructions);
         }
 
         azureRequest = azureRequest with
