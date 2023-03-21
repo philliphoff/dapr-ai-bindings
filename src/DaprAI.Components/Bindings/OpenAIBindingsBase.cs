@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Dapr.PluggableComponents.Components;
 using Dapr.PluggableComponents.Components.Bindings;
+using DaprAI.Utilities;
 
 namespace DaprAI.Bindings;
 
@@ -34,19 +35,18 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
 
     protected HttpClient HttpClient { get; private set; }
 
-    private string? azureOpenAIEndpoint;
-    private string? azureOpenAIKey;
-
     protected OpenAIBindingsBase()
     {
         this.HttpClient = new HttpClient(new HeadersProcessingHandler(this.OnAttachHeaders));
     }
 
-    protected string? Endpoint => this.azureOpenAIEndpoint;
+    protected string? Endpoint { get; private set; }
 
-    protected string? Key => this.azureOpenAIKey;
+    protected string? Key { get; private set; }
 
     protected int? MaxTokens { get; private set; }
+
+    protected string? SummarizationInstructions { get; private set; }
 
     protected decimal? Temperature { get; private set; }
 
@@ -63,26 +63,35 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
     {
         return request.Operation switch
         {
-            Constants.Operations.CompleteText => this.PromptAsync(request, cancellationToken),
+            Constants.Operations.CompleteText => this.CompleteAsync(request, cancellationToken),
+            Constants.Operations.SummarizeText => this.SummarizeAsync(request, cancellationToken),
             _ => throw new NotImplementedException(),
         };
     }
 
     public Task<string[]> ListOperationsAsync(CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(new[] { Constants.Operations.CompleteText });
+        return Task.FromResult(new[] { Constants.Operations.CompleteText, Constants.Operations.SummarizeText });
     }
 
     #endregion
 
     protected virtual Task OnInitAsync(MetadataRequest request, CancellationToken cancellationToken)
     {
-        if (!request.Properties.TryGetValue("endpoint", out this.azureOpenAIEndpoint))
+        if (request.Properties.TryGetValue("endpoint", out var endpoint))
+        {
+            this.Endpoint = endpoint;
+        }
+        else
         {
             throw new InvalidOperationException("Missing required metadata property 'endpoint'.");
         }
         
-        if (!request.Properties.TryGetValue("key", out this.azureOpenAIKey))
+        if (request.Properties.TryGetValue("key", out var key))
+        {
+            this.Key = key;
+        }
+        else 
         {
             throw new InvalidOperationException("Missing required metadata property 'key'.");
         }
@@ -90,6 +99,11 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
         if (request.Properties.TryGetValue("maxTokens", out var maxTokens))
         {
             this.MaxTokens = Int32.Parse(maxTokens);
+        }
+
+        if (request.Properties.TryGetValue("summarizationInstructions", out var summarizationInstructions))
+        {
+            this.SummarizationInstructions = summarizationInstructions;
         }
 
         if (request.Properties.TryGetValue("temperature", out var temperature))
@@ -105,7 +119,8 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
         return Task.CompletedTask;
     }
 
-    protected abstract Task<DaprCompletionResponse> OnPromptAsync(DaprCompletionRequest promptRequest, CancellationToken cancellationToken);
+    protected abstract Task<DaprCompletionResponse> OnCompleteAsync(DaprCompletionRequest completionRequest, CancellationToken cancellationToken);
+    protected abstract Task<DaprSummarizationResponse> OnSummarizeAsync(DaprSummarizationRequest summarizeRequest, CancellationToken cancellationToken);
     
     protected virtual void OnAttachHeaders(HttpRequestHeaders headers)
     {
@@ -135,13 +150,22 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
         return promptResponse;
     }
 
-    private async Task<OutputBindingInvokeResponse> PromptAsync(OutputBindingInvokeRequest request, CancellationToken cancellationToken)
+    private async Task<OutputBindingInvokeResponse> CompleteAsync(OutputBindingInvokeRequest request, CancellationToken cancellationToken)
     {
-        var promptRequest = DaprCompletionRequest.FromBytes(request.Data.Span);
+        var completionRequest = SerializationUtilities.FromBytes<DaprCompletionRequest>(request.Data.Span);
 
-        var promptResponse = await this.OnPromptAsync(promptRequest, cancellationToken);
+        var completionResponse = await this.OnCompleteAsync(completionRequest, cancellationToken);
 
-        return new OutputBindingInvokeResponse { Data = promptResponse.ToBytes() };
+        return new OutputBindingInvokeResponse { Data = SerializationUtilities.ToBytes(completionResponse) };
+    }
+
+    private async Task<OutputBindingInvokeResponse> SummarizeAsync(OutputBindingInvokeRequest request, CancellationToken cancellationToken)
+    {
+        var summarizationRequest = SerializationUtilities.FromBytes<DaprSummarizationRequest>(request.Data.Span);
+
+        var summarizationResponse = await this.OnSummarizeAsync(summarizationRequest, cancellationToken);
+
+        return new OutputBindingInvokeResponse { Data = SerializationUtilities.ToBytes(summarizationResponse) };
     }
 
     protected abstract record CompletionsRequestBase

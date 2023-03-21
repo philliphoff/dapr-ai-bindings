@@ -1,6 +1,8 @@
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text.Json.Serialization;
 using Dapr.PluggableComponents.Components;
+using DaprAI.Utilities;
 
 namespace DaprAI.Bindings;
 
@@ -36,7 +38,7 @@ internal sealed class AzureOpenAIBindings : OpenAIBindingsBase
         headers.Add("api-key", this.Key);
     }
 
-    protected override async Task<DaprCompletionResponse> OnPromptAsync(DaprCompletionRequest promptRequest, CancellationToken cancellationToken)
+    protected override async Task<DaprCompletionResponse> OnCompleteAsync(DaprCompletionRequest promptRequest, CancellationToken cancellationToken)
     {
         var isChatCompletion = await this.isChatCompletion.Value;
 
@@ -78,6 +80,57 @@ internal sealed class AzureOpenAIBindings : OpenAIBindingsBase
         }
 
         return new DaprCompletionResponse(text);
+    }
+
+    protected override async Task<DaprSummarizationResponse> OnSummarizeAsync(DaprSummarizationRequest summarizationRequest, CancellationToken cancellationToken)
+    {
+        string documentText = await SummarizationUtilities.GetDocumentText(summarizationRequest, cancellationToken);
+
+        string summarizationInstructions = String.Format(
+            CultureInfo.CurrentCulture,
+            this.SummarizationInstructions ?? throw new InvalidOperationException("Missing required metadata property 'summarizationInstructions'."),
+            documentText);
+
+        var isChatCompletion = await this.isChatCompletion.Value;
+
+        CompletionsRequest azureRequest;
+
+        if (isChatCompletion)
+        {
+            string system = $"<|im_start|>system\n{summarizationInstructions}\n<|im_end|>\n";
+            string user = $"<|im_start|>user\n{documentText}\n<|im_end|>\n";
+            string prompt = $"{system}{user}<|im_start|>assistant\n";
+
+            azureRequest = new CompletionsRequest(prompt)
+            {
+                Stop = new[] { "<|im_end|>" },
+            };
+        }
+        else
+        {
+            azureRequest = new CompletionsRequest(summarizationInstructions);
+        }
+
+        azureRequest = azureRequest with
+            {
+                MaxTokens = this.MaxTokens,
+                Temperature = this.Temperature,
+                TopP = this.TopP
+            };
+
+        var response = await this.SendRequestAsync<CompletionsRequest, CompletionsResponse>(
+            azureRequest,
+            new Uri($"{this.Endpoint}/openai/deployments/{this.azureOpenAIDeployment}/completions?api-version=2022-12-01"),
+            cancellationToken);
+
+        var summary = response.Choices.FirstOrDefault()?.Text;
+
+        if (summary == null)
+        {
+            throw new InvalidOperationException("No summary was returned.");
+        }
+
+        return new DaprSummarizationResponse(summary);
     }
 
     private async Task<bool> IsDeploymentChatCompletionModel()

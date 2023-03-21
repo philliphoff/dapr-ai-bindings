@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Net.Http.Headers;
 using Dapr.PluggableComponents.Components;
+using DaprAI.Utilities;
 
 namespace DaprAI.Bindings;
 
@@ -37,16 +39,16 @@ internal sealed class OpenAIBindings : OpenAIBindingsBase
         headers.Authorization = new AuthenticationHeaderValue("Bearer", this.Key);
     }
 
-    protected override async Task<DaprCompletionResponse> OnPromptAsync(DaprCompletionRequest promptRequest, CancellationToken cancellationToken)
+    protected override async Task<DaprCompletionResponse> OnCompleteAsync(DaprCompletionRequest completionRequest, CancellationToken cancellationToken)
     {
         if (this.IsChatCompletion())
         {
-            var userMessage = new ChatCompletionMessage("user", promptRequest.Prompt);
+            var userMessage = new ChatCompletionMessage("user", completionRequest.Prompt);
 
             var response = await this.SendRequestAsync<ChatCompletionsRequest, ChatCompletionsResponse>(
                 new ChatCompletionsRequest(
-                    !String.IsNullOrEmpty(promptRequest.System)
-                        ? new[] { new ChatCompletionMessage("system", promptRequest.System), userMessage }
+                    !String.IsNullOrEmpty(completionRequest.System)
+                        ? new[] { new ChatCompletionMessage("system", completionRequest.System), userMessage }
                         : new[] { userMessage })
                 {
                     Model = this.model,
@@ -69,7 +71,7 @@ internal sealed class OpenAIBindings : OpenAIBindingsBase
         else
         {
             var response = await this.SendRequestAsync<CompletionsRequest, CompletionsResponse>(
-                new CompletionsRequest(promptRequest.Prompt)
+                new CompletionsRequest(completionRequest.Prompt)
                 {
                     Model = this.model,
                     Temperature = this.Temperature,
@@ -88,6 +90,63 @@ internal sealed class OpenAIBindings : OpenAIBindingsBase
 
             return new DaprCompletionResponse(text);
         }
+    }
+
+    protected override async Task<DaprSummarizationResponse> OnSummarizeAsync(DaprSummarizationRequest summarizationRequest, CancellationToken cancellationToken)
+    {
+        string documentText = await SummarizationUtilities.GetDocumentText(summarizationRequest, cancellationToken);
+
+        string summarizationInstructions = String.Format(
+            CultureInfo.CurrentCulture,
+            this.SummarizationInstructions ?? throw new InvalidOperationException("Missing required metadata property 'summarizationInstructions'."),
+            documentText);
+
+        string? summary;
+
+        if (this.IsChatCompletion())
+        {
+            var response = await this.SendRequestAsync<ChatCompletionsRequest, ChatCompletionsResponse>(
+                new ChatCompletionsRequest(
+                    new[]
+                    {
+                        new ChatCompletionMessage("system", summarizationInstructions),
+                        new ChatCompletionMessage("user", documentText)
+                    })
+                {
+                    Model = this.model,
+                    Temperature = this.Temperature,
+                    MaxTokens = this.MaxTokens,
+                    TopP = this.TopP,
+                },
+                new Uri($"{this.Endpoint}/v1/chat/completions"),
+                cancellationToken);
+
+            summary = response.Choices.FirstOrDefault()?.Message?.Content;
+        }
+        else
+        {
+            string prompt = $"Summarize the following text: {documentText}";
+
+            var response = await this.SendRequestAsync<CompletionsRequest, CompletionsResponse>(
+                new CompletionsRequest(summarizationInstructions)
+                {
+                    Model = this.model,
+                    Temperature = this.Temperature,
+                    MaxTokens = this.MaxTokens,
+                    TopP = this.TopP
+                },
+                new Uri($"{this.Endpoint}/v1/completions"),
+                cancellationToken);
+
+            summary = response.Choices.FirstOrDefault()?.Text;
+        }
+
+        if (summary == null)
+        {
+            throw new InvalidOperationException("No summary was returned.");
+        }
+
+        return new DaprSummarizationResponse(summary);
     }
 
     protected override async Task OnInitAsync(MetadataRequest request, CancellationToken cancellationToken)

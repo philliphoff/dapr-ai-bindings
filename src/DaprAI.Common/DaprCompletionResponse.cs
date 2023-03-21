@@ -6,10 +6,4 @@ namespace DaprAI;
 
 public sealed record DaprCompletionResponse(
     [property: JsonPropertyName("response")]
-    string Response)
-{
-    public byte[] ToBytes()
-    {
-        return Encoding.UTF8.GetBytes(JsonSerializer.Serialize(this));
-    }
-}
+    string Response);
