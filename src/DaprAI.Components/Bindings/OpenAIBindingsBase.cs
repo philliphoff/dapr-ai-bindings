@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Dapr.Client;
 using Dapr.PluggableComponents.Components;
 using Dapr.PluggableComponents.Components.Bindings;
 using DaprAI.Utilities;
@@ -45,6 +46,8 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
     protected string? Key { get; private set; }
 
     protected int? MaxTokens { get; private set; }
+
+    protected string? StoreName { get; private set; }
 
     protected string? SummarizationInstructions { get; private set; }
 
@@ -99,6 +102,11 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
         if (request.Properties.TryGetValue("maxTokens", out var maxTokens))
         {
             this.MaxTokens = Int32.Parse(maxTokens);
+        }
+
+        if (request.Properties.TryGetValue("storeName", out var storeName))
+        {
+            this.StoreName = storeName;
         }
 
         if (request.Properties.TryGetValue("summarizationInstructions", out var summarizationInstructions))
@@ -157,6 +165,11 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
         var completionResponse = await this.OnCompleteAsync(completionRequest, cancellationToken);
 
         return new OutputBindingInvokeResponse { Data = SerializationUtilities.ToBytes(completionResponse) };
+    }
+
+    private Task<OutputBindingInvokeResponse> InitializeAIAsync(OutputBindingInvokeRequest request, CancellationToken cancellationToken)
+    {
+        return Task.FromResult(new OutputBindingInvokeResponse());
     }
 
     private async Task<OutputBindingInvokeResponse> SummarizeAsync(OutputBindingInvokeRequest request, CancellationToken cancellationToken)

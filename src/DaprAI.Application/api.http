@@ -2,7 +2,7 @@ POST http://localhost:5111/complete HTTP/1.1
 content-type: application/json
 
 {
-    "prompt": "How are you?"
+    "user": "How are you?"
 }
 
 ###

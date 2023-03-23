@@ -4,6 +4,13 @@ using DaprAI.Bindings;
 var app = DaprPluggableComponentsApplication.Create();
 
 app.RegisterService(
+    "ai-engine",
+    serviceBuilder =>
+    {
+        serviceBuilder.RegisterBinding<AiEngineBinding>();
+    });
+
+app.RegisterService(
     "open-ai",
     serviceBuilder =>
     {

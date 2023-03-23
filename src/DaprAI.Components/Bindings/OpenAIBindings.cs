@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Net.Http.Headers;
+using System.Text.Json.Serialization;
 using Dapr.PluggableComponents.Components;
 using DaprAI.Utilities;
 
@@ -39,17 +40,27 @@ internal sealed class OpenAIBindings : OpenAIBindingsBase
         headers.Authorization = new AuthenticationHeaderValue("Bearer", this.Key);
     }
 
+    private sealed record ChatHistoryItem(
+        [property: JsonPropertyName("role")]
+        string Role,
+
+        [property: JsonPropertyName("message")]
+        string Message);
+
+    private sealed record ChatHistory(
+        [property: JsonPropertyName("items")]
+        ChatHistoryItem[] Items);
+
     protected override async Task<DaprCompletionResponse> OnCompleteAsync(DaprCompletionRequest completionRequest, CancellationToken cancellationToken)
     {
         if (this.IsChatCompletion())
         {
-            var userMessage = new ChatCompletionMessage("user", completionRequest.Prompt);
+            var messages = new List<ChatCompletionMessage>(completionRequest.History?.Items.Select(item => new ChatCompletionMessage(item.Role, item.Message)) ?? Enumerable.Empty<ChatCompletionMessage>());
+
+            messages.Add(new ChatCompletionMessage("user", completionRequest.UserPrompt));
 
             var response = await this.SendRequestAsync<ChatCompletionsRequest, ChatCompletionsResponse>(
-                new ChatCompletionsRequest(
-                    !String.IsNullOrEmpty(completionRequest.System)
-                        ? new[] { new ChatCompletionMessage("system", completionRequest.System), userMessage }
-                        : new[] { userMessage })
+                new ChatCompletionsRequest(messages.ToArray())
                 {
                     Model = this.model,
                     Temperature = this.Temperature,
@@ -71,7 +82,7 @@ internal sealed class OpenAIBindings : OpenAIBindingsBase
         else
         {
             var response = await this.SendRequestAsync<CompletionsRequest, CompletionsResponse>(
-                new CompletionsRequest(completionRequest.Prompt)
+                new CompletionsRequest(completionRequest.UserPrompt)
                 {
                     Model = this.model,
                     Temperature = this.Temperature,
