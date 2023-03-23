@@ -132,9 +132,13 @@ internal sealed class AiEngineBinding : IOutputBinding
         return new OutputBindingInvokeResponse();
     }
 
-    private Task<OutputBindingInvokeResponse> SummarizeTextAsync(OutputBindingInvokeRequest request, AIEngineContext context, CancellationToken cancellationToken)
+    private async Task<OutputBindingInvokeResponse> SummarizeTextAsync(OutputBindingInvokeRequest request, AIEngineContext context, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var summarizationRequest = SerializationUtilities.FromBytes<DaprSummarizationRequest>(request.Data.Span);
+
+        var summarizationResponse = await context.DaprClient.SummarizeTextAsync(this.aiName!, summarizationRequest, cancellationToken: cancellationToken);
+
+        return new OutputBindingInvokeResponse { Data = SerializationUtilities.ToBytes(summarizationResponse) };
     }
 
     private async Task<OutputBindingInvokeResponse> TerminateChatAsync(OutputBindingInvokeRequest request, AIEngineContext context, CancellationToken cancellationToken)

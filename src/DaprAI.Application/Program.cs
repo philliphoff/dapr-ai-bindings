@@ -24,50 +24,63 @@ if (app.Environment.IsDevelopment())
 
 app.MapPost(
     "/engine/{instanceId}",
-    async (string instanceId, [FromBody] EngineCreateRequest request, [FromServices] DaprClient daprClient) =>
+    async (string instanceId, [FromBody] EngineCreateRequest request, [FromServices] DaprClient daprClient, CancellationToken cancellationToken) =>
     {
         await daprClient.AIEngineCreateChatAsync(
             new DaprAIEngineCreateChatRequest(instanceId)
             {
                 SystemInstructions = request.SystemInstructions
-            });
+            },
+            cancellationToken);
 
         return Results.Created("/engine/create", new { instanceId });
     })
-    .WithName("Create Chat")
+    .WithName("Engine: Create Chat")
     .WithOpenApi();
 
 app.MapPost(
     "/engine/{instanceId}/complete",
-    async (string instanceId, [FromBody] EngineCompletionRequest request, [FromServices] DaprClient daprClient) =>
+    async (string instanceId, [FromBody] EngineCompletionRequest request, [FromServices] DaprClient daprClient, CancellationToken cancellationToken) =>
     {
         var response = await daprClient.AIEngineCompleteTextAsync(
             new DaprAIEngineCompletionRequest(request.UserPrompt)
             {
                 InstanceId = instanceId
-            });
+            },
+            cancellationToken);
 
         return response;
     })
-    .WithName("Complete Chat Text")
+    .WithName("Engine: Complete Chat Text")
     .WithOpenApi();
 
 app.MapPost(
     "/engine/complete",
-    async ([FromBody] EngineCompletionRequest request, [FromServices] DaprClient daprClient) =>
+    async ([FromBody] EngineCompletionRequest request, [FromServices] DaprClient daprClient, CancellationToken cancellationToken) =>
     {
-        var response = await daprClient.AIEngineCompleteTextAsync(new DaprAIEngineCompletionRequest(request.UserPrompt));
+        var response = await daprClient.AIEngineCompleteTextAsync(new DaprAIEngineCompletionRequest(request.UserPrompt), cancellationToken);
 
         return response;
     })
-    .WithName("Complete Simple Text")
+    .WithName("Engine: Complete Simple Text")
+    .WithOpenApi();
+
+app.MapPost(
+    "/engine/summarize",
+    async ([FromBody] DaprSummarizationRequest request, [FromServices] DaprClient daprClient, CancellationToken cancellationToken) =>
+    {
+        var response = await daprClient.AIEngineSummarizeTextAsync(request, cancellationToken);
+
+        return response;
+    })
+    .WithName("Engine: Summarize")
     .WithOpenApi();
 
 app.MapDelete(
     "/engine/{instanceId}",
-    async (string instanceId, [FromServices] DaprClient daprClient) =>
+    async (string instanceId, [FromServices] DaprClient daprClient, CancellationToken cancellationToken) =>
     {
-        await daprClient.AIEngineTerminateChatAsync(new DaprAIEngineTerminateChatRequest(instanceId));
+        await daprClient.AIEngineTerminateChatAsync(new DaprAIEngineTerminateChatRequest(instanceId), cancellationToken);
 
         return Results.Ok();
     })
