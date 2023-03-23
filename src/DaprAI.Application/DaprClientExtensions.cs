@@ -8,7 +8,7 @@ internal static class DaprClientExtensions
     {
         var bindingMetadata = new Dictionary<string, string>
         {
-            { Constants.Metadata.DaprPort, metadata?.DaprPort.ToString() ?? Environment.GetEnvironmentVariable(Constants.EnvironmentVariables.GrpcPort) ?? String.Empty }
+            { Constants.Metadata.DaprGrpcPort, metadata?.DaprGrpcPort.ToString() ?? Environment.GetEnvironmentVariable(Constants.EnvironmentVariables.DaprGrpcPort) ?? String.Empty }
         };
 
         return daprClient.InvokeBindingAsync<DaprCompletionRequest, DaprCompletionResponse>(component, Constants.Operations.CompleteText, request, bindingMetadata, cancellationToken);

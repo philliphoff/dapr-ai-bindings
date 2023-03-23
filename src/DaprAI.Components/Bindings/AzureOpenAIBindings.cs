@@ -79,7 +79,7 @@ internal sealed class AzureOpenAIBindings : OpenAIBindingsBase
             throw new InvalidOperationException("No text was returned.");
         }
 
-        return new DaprCompletionResponse(text);
+        return new DaprCompletionResponse(null, text);
     }
 
     protected override async Task<DaprSummarizationResponse> OnSummarizeAsync(DaprSummarizationRequest summarizationRequest, CancellationToken cancellationToken)

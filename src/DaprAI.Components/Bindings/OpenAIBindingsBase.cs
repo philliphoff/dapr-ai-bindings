@@ -47,6 +47,8 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
 
     protected int? MaxTokens { get; private set; }
 
+    protected string? StoreName { get; private set; }
+
     protected string? SummarizationInstructions { get; private set; }
 
     protected decimal? Temperature { get; private set; }
@@ -102,6 +104,11 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
             this.MaxTokens = Int32.Parse(maxTokens);
         }
 
+        if (request.Properties.TryGetValue("storeName", out var storeName))
+        {
+            this.StoreName = storeName;
+        }
+
         if (request.Properties.TryGetValue("summarizationInstructions", out var summarizationInstructions))
         {
             this.SummarizationInstructions = summarizationInstructions;
@@ -153,7 +160,7 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
 
     private async Task<OutputBindingInvokeResponse> CompleteAsync(OutputBindingInvokeRequest request, CancellationToken cancellationToken)
     {
-        if (!request.Metadata.TryGetValue(Constants.Metadata.DaprPort, out var daprPort))
+        if (!request.Metadata.TryGetValue(Constants.Metadata.DaprGrpcPort, out var daprPort))
         {
             throw new InvalidOperationException("Missing required metadata property 'daprPort'.");
         }
