@@ -3,14 +3,9 @@ using System.Text.Json.Serialization;
 namespace DaprAI;
 
 public sealed record DaprCompletionRequest(
-    [property: JsonPropertyName("prompt")]
-    string Prompt)
+    [property: JsonPropertyName("user")]
+    string UserPrompt)
 {
-    [JsonPropertyName("instanceId")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? InstanceId { get; init; }
-
-    [JsonPropertyName("system")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? System { get; init; }
+    [JsonPropertyName("history")]
+    public DaprChatHistory? History { get; init; }
 }

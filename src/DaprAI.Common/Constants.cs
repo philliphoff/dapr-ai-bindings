@@ -15,6 +15,10 @@ public static class Constants
     {
         public const string CompleteText = "completeText";
 
+        public const string CreateChat = "createChat";
+
         public const string SummarizeText = "summarizeText";
+
+        public const string TerminateChat = "terminateChat";
     }
 }

@@ -127,7 +127,7 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
         return Task.CompletedTask;
     }
 
-    protected abstract Task<DaprCompletionResponse> OnCompleteAsync(DaprCompletionRequest completionRequest, CompletionContext context, CancellationToken cancellationToken);
+    protected abstract Task<DaprCompletionResponse> OnCompleteAsync(DaprCompletionRequest completionRequest, CancellationToken cancellationToken);
     protected abstract Task<DaprSummarizationResponse> OnSummarizeAsync(DaprSummarizationRequest summarizeRequest, CancellationToken cancellationToken);
     
     protected virtual void OnAttachHeaders(HttpRequestHeaders headers)
@@ -160,16 +160,9 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
 
     private async Task<OutputBindingInvokeResponse> CompleteAsync(OutputBindingInvokeRequest request, CancellationToken cancellationToken)
     {
-        if (!request.Metadata.TryGetValue(Constants.Metadata.DaprGrpcPort, out var daprPort))
-        {
-            throw new InvalidOperationException("Missing required metadata property 'daprPort'.");
-        }
-
-        var daprClient = new DaprClientBuilder().UseGrpcEndpoint($"http://127.0.0.1:{daprPort}").Build();
-
         var completionRequest = SerializationUtilities.FromBytes<DaprCompletionRequest>(request.Data.Span);
 
-        var completionResponse = await this.OnCompleteAsync(completionRequest, new CompletionContext(daprClient), cancellationToken);
+        var completionResponse = await this.OnCompleteAsync(completionRequest, cancellationToken);
 
         return new OutputBindingInvokeResponse { Data = SerializationUtilities.ToBytes(completionResponse) };
     }
@@ -187,8 +180,6 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
 
         return new OutputBindingInvokeResponse { Data = SerializationUtilities.ToBytes(summarizationResponse) };
     }
-
-    protected sealed record CompletionContext(DaprClient DaprClient);
 
     protected abstract record CompletionsRequestBase
     {

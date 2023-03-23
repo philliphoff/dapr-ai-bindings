@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json.Serialization;
 using Dapr.PluggableComponents.Components;
 using DaprAI.Utilities;
@@ -38,7 +39,7 @@ internal sealed class AzureOpenAIBindings : OpenAIBindingsBase
         headers.Add("api-key", this.Key);
     }
 
-    protected override async Task<DaprCompletionResponse> OnCompleteAsync(DaprCompletionRequest promptRequest, CompletionContext context, CancellationToken cancellationToken)
+    protected override async Task<DaprCompletionResponse> OnCompleteAsync(DaprCompletionRequest promptRequest, CancellationToken cancellationToken)
     {
         var isChatCompletion = await this.isChatCompletion.Value;
 
@@ -46,9 +47,17 @@ internal sealed class AzureOpenAIBindings : OpenAIBindingsBase
 
         if (isChatCompletion)
         {
-            string system = promptRequest.System != null ? $"<|im_start|>system\n{promptRequest.System}\n<|im_end|>\n" : String.Empty;
-            string user = $"<|im_start|>user\n{promptRequest.Prompt}\n<|im_end|>\n";
-            string prompt = $"{system}{user}<|im_start|>assistant\n";
+            var builder = new StringBuilder();
+
+            foreach (var item in promptRequest.History?.Items ?? Enumerable.Empty<DaprChatHistoryItem>())
+            {
+                builder.Append($"<|im_start|>{item.Role}\n{item.Message}\n<|im_end|>\n");
+            }
+
+            builder.Append($"<|im_start|>user\n{promptRequest.UserPrompt}\n<|im_end|>\n");
+            builder.Append("<|im_start|>assistant\n");
+
+            string prompt = builder.ToString();
 
             azureRequest = new CompletionsRequest(prompt)
             {
@@ -57,7 +66,7 @@ internal sealed class AzureOpenAIBindings : OpenAIBindingsBase
         }
         else
         {
-            azureRequest = new CompletionsRequest(promptRequest.Prompt);
+            azureRequest = new CompletionsRequest(promptRequest.UserPrompt);
         }
 
         azureRequest = azureRequest with
@@ -79,7 +88,7 @@ internal sealed class AzureOpenAIBindings : OpenAIBindingsBase
             throw new InvalidOperationException("No text was returned.");
         }
 
-        return new DaprCompletionResponse(null, text);
+        return new DaprCompletionResponse(text);
     }
 
     protected override async Task<DaprSummarizationResponse> OnSummarizeAsync(DaprSummarizationRequest summarizationRequest, CancellationToken cancellationToken)

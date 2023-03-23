@@ -51,25 +51,13 @@ internal sealed class OpenAIBindings : OpenAIBindingsBase
         [property: JsonPropertyName("items")]
         ChatHistoryItem[] Items);
 
-    protected override async Task<DaprCompletionResponse> OnCompleteAsync(DaprCompletionRequest completionRequest, CompletionContext context, CancellationToken cancellationToken)
+    protected override async Task<DaprCompletionResponse> OnCompleteAsync(DaprCompletionRequest completionRequest, CancellationToken cancellationToken)
     {
         if (this.IsChatCompletion())
         {
-            string instanceId = completionRequest.InstanceId ?? Guid.NewGuid().ToString();
-            string key = $"ai-chat-history-{instanceId}";
+            var messages = new List<ChatCompletionMessage>(completionRequest.History?.Items.Select(item => new ChatCompletionMessage(item.Role, item.Message)) ?? Enumerable.Empty<ChatCompletionMessage>());
 
-            var history = await context.DaprClient.GetStateAsync<ChatHistory>(this.StoreName, key, cancellationToken: cancellationToken);
-
-            history ??= new ChatHistory(Array.Empty<ChatHistoryItem>());
-
-            var messages = new List<ChatCompletionMessage>(history.Items.Select(item => new ChatCompletionMessage(item.Role, item.Message)));
-
-            if (!messages.Any() && !String.IsNullOrEmpty(completionRequest.System))
-            {
-                messages.Add(new ChatCompletionMessage("system", completionRequest.System));
-            }
-
-            messages.Add(new ChatCompletionMessage("user", completionRequest.Prompt));
+            messages.Add(new ChatCompletionMessage("user", completionRequest.UserPrompt));
 
             var response = await this.SendRequestAsync<ChatCompletionsRequest, ChatCompletionsResponse>(
                 new ChatCompletionsRequest(messages.ToArray())
@@ -89,21 +77,12 @@ internal sealed class OpenAIBindings : OpenAIBindingsBase
                 throw new InvalidOperationException("No chat content was returned.");
             }
 
-            messages.Add(new ChatCompletionMessage("assistant", content));
-
-            history = history with
-            {
-                Items = messages.Select(item => new ChatHistoryItem(item.Role, item.Content)).ToArray()
-            };
-
-            await context.DaprClient.SaveStateAsync(this.StoreName, key, history, cancellationToken: cancellationToken);
-
-            return new DaprCompletionResponse(instanceId, content);
+            return new DaprCompletionResponse(content);
         }
         else
         {
             var response = await this.SendRequestAsync<CompletionsRequest, CompletionsResponse>(
-                new CompletionsRequest(completionRequest.Prompt)
+                new CompletionsRequest(completionRequest.UserPrompt)
                 {
                     Model = this.model,
                     Temperature = this.Temperature,
@@ -120,7 +99,7 @@ internal sealed class OpenAIBindings : OpenAIBindingsBase
                 throw new InvalidOperationException("No text was returned.");
             }
 
-            return new DaprCompletionResponse(null, text);
+            return new DaprCompletionResponse(text);
         }
     }
 
