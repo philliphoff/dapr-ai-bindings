@@ -20,11 +20,90 @@ Dapr applications communicate with external services through a set of configured
 
 While the Dapr runtime provides a large selection of built-in components for various services, developers can create "pluggable" components (using Dapr 1.9 onward) to access services not yet part of the runtime (or might be internal to the enterprise). Pluggable components can be created (today) for the state store, pub-sub, and input/output binding building blocks.
 
-This sample uses a set of output binding pluggable components to create an abstraction layer atop several different AI services: Open AI, Azure Open AI, and other Azure AI offerings such as Cognitive Services. Because each component implements the same set of operations, using the same request/response data, the application can switch between them no code changes. Cnfiguration files are then used to allow components the ability to connect with their respective services and control how the components function.
+This sample uses a set of output binding pluggable components to create an abstraction layer atop several different AI services: Open AI, Azure Open AI, and other Azure AI offerings such as Cognitive Services. Because each component implements the same set of operations, using the same request/response data, the application can switch between them no code changes. Configuration files are then used to allow components the ability to connect with their respective services and control how the components function.
+
+These AI components can be used by applications directly, but there are common patterns of use that lend themselves to higher-level orchestration.  For example, "chat" based language models typically require clients pass the entire history of a user's session for each completion, in order to provide the illusion of a continuous conversation. This implies a need to accumulate and manage session data, which would become a constant chore across applications. Conveniently, Dapr has a state store building block that can be used for that purpose. This is used by an "AI engine" component, another output binding itself, to expose an API that represents an AI service that maintains state. The engine uses its component configuration to determine which underlying AI service and state store is used.
 
 The application itself is a basic web API with two endpoints, `/complete` and `/summarize`, that act as a proxies for requests to the AI binding components to enable easy testing.  Those endpoints support an optional `component` query parameter to demonstrate the application switching between components with no code changes.
 
 ![Architecture Diagram](assets/dapr-ai-bindings-diagram.png)
+
+### AI Engine
+
+The "AI engine" consists of an output binding supporting the following operations:
+
+- **`createChat`:** create a chat session
+- **`completeText`:** request a "completion" of (i.e a response to) a user's text prompt
+- **`summarizeText`:** request the summarization of a text document (provided inline or via an URL)
+- **`terminateChat`:** delete a chat session
+
+Component configuration metadata:
+
+| Name | Required | Description |
+|---|---|---|
+| `aiName` | Yes | The name of the component to use as the underlying AI service |
+| `storeName` | Yes | The name of the component to use as the underlying state store |
+
+#### Create Chat
+
+The `createChat` operation enables the engine to track the prompts/responses of a chat session. The engine the provides the underlying AI service with that history on each subsequent request for a text completion.
+
+Creation expects a request of the form:
+
+```json
+{
+   "instanceId": "<A unique ID for the session>",
+   "system": "<If provided, instructions for how the assistant should respond to user prompts>"
+}
+```
+
+#### Text Completion
+
+The `completeText` operation continues a chat session with the next user prompt.
+
+Completion expects a request of the form:
+
+```json
+{
+   "instanceId": "<If provided, the ID of the session>",
+   "user": "The user's prompt (e.g. 'How are you?')>"
+}
+```
+
+> Note that, if the `instanceId` is omitted, completions will be provided with no historical context (i.e. it is a straight pass through to the underlying AI service).
+
+#### Text Summarization
+
+The `summarizeText` operation expect a request of the form:
+
+```json
+{
+   "text": "<If provided, the actual text to summarize>",
+   "url": "<If provided, a URL for the text document to summarize>"
+}
+```
+
+The engine makes the request via the underlying AI service and returns a response of the form:
+
+```json
+{
+   "summary": "<The AI summarization of the text>"
+}
+```
+
+> Note that summarization is performed with no historical context (i.e. it is a straight pass through to the underlying AI service).
+
+#### Terminate Chat
+
+The `terminateChat` operation enables the engine to remove the history of a chat session.
+
+Deletion expects a request of the form:
+
+```json
+{
+   "instanceId": "<The ID of the session>"
+}
+```
 
 ### AI Building Block
 
@@ -41,18 +120,24 @@ Components supporting the `completeText` operation expect a request of the form:
 
 ```json
 {
-   "system": "<(Optional) Instructions for how the AI should respond to the user>",
-   "prompt": "<The user's prompt (e.g. 'How are you?')>"
+   "history":
+   {
+      "items":
+      [
+         { "role": "system", message: "You are a helpful AI assistant." }
+      ]
+   },
+   "user": "<The user's prompt (e.g. 'How are you?')>"
 }
 ```
 
-> Note that some language models may ignore the system instructions, even when provided.
+> Note that some language models may ignore past chat history, even when provided.
 
 The components make the request of their respective service and are then expected to return a response of the form:
 
 ```json
 {
-   "response": "<The AI response to the user's prompt>"
+   "assistant": "<The AI assistant response to the user's prompt>"
 }
 ```
 
@@ -67,7 +152,7 @@ Components supporting the `summarizeText` operation expect a request of the form
 }
 ```
 
-The components make the requeset of their respective service and are then expected to return a response of the form:
+The components make the request of their respective service and are then expected to return a response of the form:
 
 ```json
 {
@@ -131,6 +216,7 @@ Component configuration metadata:
 - [Dapr 1.10](https://dapr.io/) or later
 - [.NET 7](https://dotnet.microsoft.com/) or later
 - Linux, MacOS, or Windows using WSL
+- A running Redis DB (such as the default Dapr state store container)
 
 To use the Chat GPT binding, you must have an Open AI account and an [API key](https://platform.openai.com/account/api-keys).
 
@@ -155,7 +241,10 @@ To use the `.http` files to send requests, install the [REST Client](https://mar
       "azure-open-ai-key": "<Azure Open AI API key>"
 
       "open-api-endpoint": "https://api.openai.com"
-      "open-api-key": "<Open AI API key>"
+      "open-api-key": "<Open AI API key>",
+
+      "ai-store-host": "<redis host>",
+      "ai-store-password": "<redis password>"
    }
    ```
 
@@ -179,7 +268,7 @@ To use the `.http` files to send requests, install the [REST Client](https://mar
    content-type: application/json
 
    {
-       "prompt": "How are you?"
+       "user": "How are you?"
    }
    ```
 
@@ -194,7 +283,7 @@ To use the `.http` files to send requests, install the [REST Client](https://mar
    Transfer-Encoding: chunked
 
    {
-     "response": "\n\nI'm doing well, thanks for asking. How are you?"
+     "assistant": "\n\nI'm doing well, thanks for asking. How are you?"
    }
    ```
 
