@@ -7,8 +7,15 @@ namespace DaprAI.Bindings;
 
 internal sealed class AiEngineBinding : IOutputBinding
 {
+    private readonly ILogger<AiEngineBinding> logger;
+
     private string? aiName;
     private string? storeName;
+
+    public AiEngineBinding(ILogger<AiEngineBinding> logger)
+    {
+        this.logger = logger;
+    }
 
     #region IOutputBinding Members
 
@@ -24,6 +31,8 @@ internal sealed class AiEngineBinding : IOutputBinding
             throw new InvalidOperationException("The storeName metadata property is required.");
         }
 
+        this.logger.LogInformation("AI Engine is using AI service '{aiName}' with state store '{storeName}.'", this.aiName, this.storeName);
+
         return Task.CompletedTask;
     }
 
@@ -34,7 +43,11 @@ internal sealed class AiEngineBinding : IOutputBinding
             throw new InvalidOperationException("Missing required metadata property 'daprGrpcPort'.");
         }
 
-        var daprClient = new DaprClientBuilder().UseGrpcEndpoint($"http://127.0.0.1:{daprPort}").Build();
+        string daprGrpcEndpoint = $"http://127.0.0.1:{daprPort}";
+
+        this.logger.LogDebug("AI Engine is using Dapr gRPC endpoint '{daprGrpcEndpoint}'.", daprGrpcEndpoint);
+
+        var daprClient = new DaprClientBuilder().UseGrpcEndpoint(daprGrpcEndpoint).Build();
         var context = new AIEngineContext(daprClient);
 
         return request.Operation switch
