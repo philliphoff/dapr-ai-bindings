@@ -2,6 +2,8 @@ version: "3.9"
 services:
   app:
     build:
+      args: 
+        - PORT=5050
       dockerfile: ./src/DaprAI.Application/Dockerfile
       context: .
     ports:

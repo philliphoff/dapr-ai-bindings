@@ -226,7 +226,41 @@ To use the Azure Open AI binding, you must have an [Azure Open AI](https://azure
 
 To use the `.http` files to send requests, install the [REST Client](https://marketplace.visualstudio.com/items?itemName=humao.rest-client) VS Code extension.
 
-## Setup
+## Running in Docker Compose
+
+The `docker-compose.yaml` in the repo root will deploy the application, Dapr sidecar, and the AI components sidecar at the same time, which is useful to get everything running and debugging is not a concern. The application will then be exposed locally on port `5050`.
+
+1. Configure the secrets used by the components: 
+
+   Create a JSON file called `secrets.json` in `./src/DaprAI.Application/components/compose` to hold the access keys. It should look something like:
+
+   ```json
+   {
+      "azure-ai-endpoint": "https://<name>.cognitiveservices.azure.com",
+      "azure-ai-key": "<Azure Cognitive Services key>",
+
+      "azure-open-ai-endpoint": "https://<name>.openai.azure.com"
+      "azure-open-ai-key": "<Azure Open AI API key>"
+
+      "open-api-endpoint": "https://api.openai.com"
+      "open-api-key": "<Open AI API key>",
+
+      "ai-store-host": "<redis host>",
+      "ai-store-password": "<redis password>"
+   }
+   ```
+
+   > Note that the Redis configuration will most likely be `redis` with an empty password.
+
+1. Start the composition:
+
+   ```bash
+   docker compose up
+   ```
+
+   This should build the container images for the application and components, and start them alongside the Dapr sidecar.  At this point, the application should be available at `http://localhost:5050`.
+
+## Running Locally
 
 1. Configure the Dapr components.
 
