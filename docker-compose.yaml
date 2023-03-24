@@ -8,27 +8,33 @@ services:
       - "5050:5050"
   dapr:
     image: "daprio/daprd:1.10.4"
-    command: ["./daprd", "--app-id", "app", "--app-port", "5050", "--components-path", "./components"]
+    command: ["./daprd", "--app-id", "app", "--app-port", "5050", "--components-path", "./components", "--log-level", "debug"]
     network_mode: "service:app"
     depends_on:
       - app
       - components
+      - redis
     volumes:
       - dapr-components-sockets:/tmp/dapr-components-sockets
-      - type: bind
-        source: ./src/DaprAI.Application/components
-        target: /components
-      - type: bind
-        source: ./src/DaprAI.Application/components/compose
-        target: /components
+      - ./src/DaprAI.Application/components/ai-engine.yaml:/components/ai-engine.yaml
+      - ./src/DaprAI.Application/components/ai-store.yaml:/components/ai-store.yaml
+      - ./src/DaprAI.Application/components/azure-ai-binding.yaml:/components/azure-ai-binding.yaml
+      - ./src/DaprAI.Application/components/azure-open-ai-davinci.yaml:/components/azure-open-ai-davinci.yaml
+      - ./src/DaprAI.Application/components/azure-open-ai-gpt.yaml:/components/azure-open-ai-davinci.yaml
+      - ./src/DaprAI.Application/components/open-ai-davinci-binding.yaml:/components/open-ai-davinci-binding.yaml
+      - ./src/DaprAI.Application/components/open-ai-gpt-binding.yaml:/components/open-ai-gpt-binding.yaml
+      - ./src/DaprAI.Application/components/compose/secrets.yaml:/components/secrets.yaml
+      - ./src/DaprAI.Application/components/compose/secrets.json:/components/secrets.json
   components:
     build:
       dockerfile: ./src/DaprAI.Components/Dockerfile
       context: .
+    environment:
+      - Logging__Console__LogLevel__Default=Debug
     network_mode: "service:app"
-    depends_on:
-      - app
     volumes:
       - dapr-components-sockets:/tmp/dapr-components-sockets
+  redis:
+    image: redis
 volumes:
   dapr-components-sockets:

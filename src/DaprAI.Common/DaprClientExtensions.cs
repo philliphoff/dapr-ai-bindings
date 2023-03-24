@@ -37,7 +37,7 @@ public static class DaprClientExtensions
     private static IReadOnlyDictionary<string, string> GetBindingMetadata(DaprAIMetadata? metadata) =>
         new Dictionary<string, string>
         {
-            { Constants.Metadata.DaprGrpcPort, metadata?.DaprGrpcPort.ToString() ?? Environment.GetEnvironmentVariable(Constants.EnvironmentVariables.DaprGrpcPort) ?? String.Empty }
+            { Constants.Metadata.DaprGrpcPort, metadata?.DaprGrpcPort.ToString() ?? Environment.GetEnvironmentVariable(Constants.EnvironmentVariables.DaprGrpcPort) ?? "50001" }
         };
 
     private static string GetAIEngineName(DaprAIMetadata? metadata) =>
