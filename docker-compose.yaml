@@ -1,0 +1,28 @@
+version: "3.9"
+services:
+  app:
+    build:
+      dockerfile: ./src/DaprAI.Application/Dockerfile
+      context: .
+    ports:
+      - "5050:5050"
+  dapr:
+    image: "daprio/daprd:1.10.4"
+    command: ["./daprd", "--app-id", "app", "--app-port", "5050"]
+    network_mode: "service:app"
+    depends_on:
+      - app
+      - components
+    volumes:
+      - dapr-components-sockets:/tmp/dapr-components-sockets:rw
+  components:
+    build:
+      dockerfile: ./src/DaprAI.Components/Dockerfile
+      context: .
+    network_mode: "service:app"
+    depends_on:
+      - app
+    volumes:
+      - dapr-components-sockets:/tmp/dapr-components-sockets:rw
+volumes:
+  dapr-components-sockets:
