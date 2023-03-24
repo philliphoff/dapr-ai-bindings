@@ -8,13 +8,19 @@ services:
       - "5050:5050"
   dapr:
     image: "daprio/daprd:1.10.4"
-    command: ["./daprd", "--app-id", "app", "--app-port", "5050"]
+    command: ["./daprd", "--app-id", "app", "--app-port", "5050", "--components-path", "./components"]
     network_mode: "service:app"
     depends_on:
       - app
       - components
     volumes:
-      - dapr-components-sockets:/tmp/dapr-components-sockets:rw
+      - dapr-components-sockets:/tmp/dapr-components-sockets
+      - type: bind
+        source: ./src/DaprAI.Application/components
+        target: /components
+      - type: bind
+        source: ./src/DaprAI.Application/components/compose
+        target: /components
   components:
     build:
       dockerfile: ./src/DaprAI.Components/Dockerfile
@@ -23,6 +29,6 @@ services:
     depends_on:
       - app
     volumes:
-      - dapr-components-sockets:/tmp/dapr-components-sockets:rw
+      - dapr-components-sockets:/tmp/dapr-components-sockets
 volumes:
   dapr-components-sockets:
