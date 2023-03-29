@@ -16,6 +16,12 @@ public static class DaprClientExtensions
     public static Task<DaprAIEngineCompletionResponse> AIEngineCompleteTextAsync(this DaprClient daprClient, DaprAIEngineCompletionRequest request, DaprAIMetadata? metadata, CancellationToken cancellationToken = default) =>
         daprClient.InvokeBindingAsync<DaprAIEngineCompletionRequest, DaprAIEngineCompletionResponse>(GetAIEngineName(metadata), Constants.Operations.CompleteText, request, GetBindingMetadata(metadata), cancellationToken);
 
+    public static Task<DaprAIEngineGetChatResponse> AIEngineGetChatAsync(this DaprClient daprClient, DaprAIEngineGetChatRequest request, CancellationToken cancellationToken = default) =>
+        AIEngineGetChatAsync(daprClient, request, null, cancellationToken);
+
+    public static Task<DaprAIEngineGetChatResponse> AIEngineGetChatAsync(this DaprClient daprClient, DaprAIEngineGetChatRequest request, DaprAIMetadata? metadata, CancellationToken cancellationToken = default) =>
+        daprClient.InvokeBindingAsync<DaprAIEngineGetChatRequest, DaprAIEngineGetChatResponse>(GetAIEngineName(metadata), Constants.Operations.GetChat, request, GetBindingMetadata(metadata), cancellationToken);
+
     public static Task<DaprSummarizationResponse> AIEngineSummarizeTextAsync(this DaprClient daprClient, DaprSummarizationRequest request, CancellationToken cancellationToken = default) =>
         AIEngineSummarizeTextAsync(daprClient, request, null, cancellationToken);
 

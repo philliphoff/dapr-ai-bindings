@@ -54,6 +54,7 @@ internal sealed class AiEngineBinding : IOutputBinding
         {
             Constants.Operations.CompleteText => this.CompleteTextAsync(request, context, cancellationToken),
             Constants.Operations.CreateChat => this.CreateChatAsync(request, context, cancellationToken),
+            Constants.Operations.GetChat => this.GetChatAsync(request, context, cancellationToken),
             Constants.Operations.SummarizeText => this.SummarizeTextAsync(request, context, cancellationToken),
             Constants.Operations.TerminateChat => this.TerminateChatAsync(request, context, cancellationToken),
             _ => throw new NotImplementedException(),
@@ -67,6 +68,7 @@ internal sealed class AiEngineBinding : IOutputBinding
             {
                 Constants.Operations.CompleteText,
                 Constants.Operations.CreateChat,
+                Constants.Operations.GetChat,
                 Constants.Operations.SummarizeText,
                 Constants.Operations.TerminateChat
             });
@@ -143,6 +145,17 @@ internal sealed class AiEngineBinding : IOutputBinding
         await context.DaprClient.SaveStateAsync(this.storeName!, key, history, cancellationToken: cancellationToken);
 
         return new OutputBindingInvokeResponse();
+    }
+
+    private async Task<OutputBindingInvokeResponse> GetChatAsync(OutputBindingInvokeRequest request, AIEngineContext context, CancellationToken cancellationToken)
+    {
+        var getRequest = SerializationUtilities.FromBytes<DaprAIEngineGetChatRequest>(request.Data.Span);
+
+        string key = CreateKey(getRequest.InstanceId);
+
+        var history = await context.DaprClient.GetStateAsync<DaprChatHistory?>(this.storeName!, key, cancellationToken: cancellationToken);
+
+        return new OutputBindingInvokeResponse { Data = SerializationUtilities.ToBytes(new DaprAIEngineGetChatResponse { History = history }) };
     }
 
     private async Task<OutputBindingInvokeResponse> SummarizeTextAsync(OutputBindingInvokeRequest request, AIEngineContext context, CancellationToken cancellationToken)

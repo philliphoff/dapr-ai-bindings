@@ -22,6 +22,17 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.MapGet(
+    "/engine/{instanceId}",
+    async (string instanceId, [FromServices] DaprClient daprClient, CancellationToken cancellationToken) =>
+    {
+        var response = await daprClient.AIEngineGetChatAsync(new DaprAIEngineGetChatRequest(instanceId), cancellationToken);
+
+        return response.History is not null ? Results.Ok(response.History) : Results.NotFound();
+    })
+    .WithName("Engine: Get Chat")
+    .WithOpenApi();
+
 app.MapPost(
     "/engine/{instanceId}",
     async (string instanceId, [FromBody] EngineCreateRequest request, [FromServices] DaprClient daprClient, CancellationToken cancellationToken) =>
