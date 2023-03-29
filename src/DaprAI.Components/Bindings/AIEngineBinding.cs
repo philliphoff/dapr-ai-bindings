@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Dapr.Client;
 using Dapr.PluggableComponents.Components;
 using Dapr.PluggableComponents.Components.Bindings;
@@ -55,6 +56,7 @@ internal sealed class AiEngineBinding : IOutputBinding
             Constants.Operations.CompleteText => this.CompleteTextAsync(request, context, cancellationToken),
             Constants.Operations.CreateChat => this.CreateChatAsync(request, context, cancellationToken),
             Constants.Operations.GetChat => this.GetChatAsync(request, context, cancellationToken),
+            Constants.Operations.GetChats => this.GetChatsAsync(request, context, cancellationToken),
             Constants.Operations.SummarizeText => this.SummarizeTextAsync(request, context, cancellationToken),
             Constants.Operations.TerminateChat => this.TerminateChatAsync(request, context, cancellationToken),
             _ => throw new NotImplementedException(),
@@ -69,6 +71,7 @@ internal sealed class AiEngineBinding : IOutputBinding
                 Constants.Operations.CompleteText,
                 Constants.Operations.CreateChat,
                 Constants.Operations.GetChat,
+                Constants.Operations.GetChats,
                 Constants.Operations.SummarizeText,
                 Constants.Operations.TerminateChat
             });
@@ -128,21 +131,21 @@ internal sealed class AiEngineBinding : IOutputBinding
     {
         var createRequest = SerializationUtilities.FromBytes<DaprAIEngineCreateChatRequest>(request.Data.Span);
 
+        await this.AddIdToIndex(createRequest.InstanceId, context.DaprClient, cancellationToken);
+
         string key = CreateKey(createRequest.InstanceId);
 
         var history = await context.DaprClient.GetStateAsync<DaprChatHistory>(this.storeName!, key, cancellationToken: cancellationToken);
 
-        if (history is not null)
+        if (history is null)
         {
-            throw new InvalidOperationException("The chat instance already exists.");
+            history = new DaprChatHistory(
+                !String.IsNullOrEmpty(createRequest.SystemInstructions)
+                    ? new[] { new DaprChatHistoryItem("system", createRequest.SystemInstructions) }
+                    : Array.Empty<DaprChatHistoryItem>());
+
+            await context.DaprClient.SaveStateAsync(this.storeName!, key, history, cancellationToken: cancellationToken);
         }
-
-        history = new DaprChatHistory(
-            !String.IsNullOrEmpty(createRequest.SystemInstructions)
-                ? new[] { new DaprChatHistoryItem("system", createRequest.SystemInstructions) }
-                : Array.Empty<DaprChatHistoryItem>());
-
-        await context.DaprClient.SaveStateAsync(this.storeName!, key, history, cancellationToken: cancellationToken);
 
         return new OutputBindingInvokeResponse();
     }
@@ -156,6 +159,19 @@ internal sealed class AiEngineBinding : IOutputBinding
         var history = await context.DaprClient.GetStateAsync<DaprChatHistory?>(this.storeName!, key, cancellationToken: cancellationToken);
 
         return new OutputBindingInvokeResponse { Data = SerializationUtilities.ToBytes(new DaprAIEngineGetChatResponse { History = history }) };
+    }
+
+    private async Task<OutputBindingInvokeResponse> GetChatsAsync(OutputBindingInvokeRequest request, AIEngineContext context, CancellationToken cancellationToken)
+    {
+        // TODO: There are race conditions related to maintaining the index. It would be much better to do a key scan on the store, if only there was a common way to do that.
+
+        var getRequest = SerializationUtilities.FromBytes<DaprAIEngineGetChatsRequest>(request.Data.Span);
+
+        var metadata = await context.DaprClient.GetMetadataAsync(cancellationToken);
+
+        var index = await context.DaprClient.GetStateAsync<ChatIndex>(this.storeName!, ChatIndexKey, cancellationToken: cancellationToken);
+
+        return new OutputBindingInvokeResponse { Data = SerializationUtilities.ToBytes(new DaprAIEngineGetChatsResponse { Chats = index?.InstanceIds.Select(id => new DaprAIEngineGetChatsChat(id)).ToArray() ?? Array.Empty<DaprAIEngineGetChatsChat>() }) };
     }
 
     private async Task<OutputBindingInvokeResponse> SummarizeTextAsync(OutputBindingInvokeRequest request, AIEngineContext context, CancellationToken cancellationToken)
@@ -175,10 +191,60 @@ internal sealed class AiEngineBinding : IOutputBinding
 
         await context.DaprClient.DeleteStateAsync(this.storeName!, key, cancellationToken: cancellationToken);
 
+        await this.RemoveIdFromIndex(terminateRequest.InstanceId, context.DaprClient, cancellationToken);
+
         return new OutputBindingInvokeResponse();
+    }
+
+    private async Task AddIdToIndex(string instanceId, DaprClient daprClient, CancellationToken cancellationToken)
+    {
+        var index = await daprClient.GetStateAsync<ChatIndex?>(this.storeName!, ChatIndexKey, cancellationToken: cancellationToken);
+
+        if (index is null)
+        {
+            index = new ChatIndex(new[] { instanceId });
+        }
+        else
+        {
+            var ids = new HashSet<string>(index.InstanceIds);
+
+            if (ids.Contains(instanceId))
+            {
+                return;
+            }
+
+            ids.Add(instanceId);
+
+            index = index with { InstanceIds = ids.ToArray() };
+        }
+
+        await daprClient.SaveStateAsync(this.storeName!, ChatIndexKey, index, cancellationToken: cancellationToken);
+    }
+
+    private async Task RemoveIdFromIndex(string instanceId, DaprClient daprClient, CancellationToken cancellationToken)
+    {
+        var index = await daprClient.GetStateAsync<ChatIndex?>(this.storeName!, ChatIndexKey, cancellationToken: cancellationToken);
+
+        if (index is not null)
+        {
+            var ids = new HashSet<string>(index.InstanceIds);
+
+            if (ids.Remove(instanceId))
+            {
+                index = index with { InstanceIds = ids.ToArray() };
+
+                await daprClient.SaveStateAsync(this.storeName!, ChatIndexKey, index, cancellationToken: cancellationToken);
+            }
+        }
     }
 
     private static string CreateKey(string instanceId) => $"ai-chat-history-{instanceId}";
 
     private sealed record AIEngineContext(DaprClient DaprClient);
+
+    private const string ChatIndexKey = "ai-chat-index";
+
+    private sealed record ChatIndex(
+        [property: JsonPropertyName("ids")]
+        string[] InstanceIds);
 }

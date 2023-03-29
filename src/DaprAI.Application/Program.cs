@@ -23,7 +23,18 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapGet(
-    "/engine/{instanceId}",
+    "/engine/chats",
+    async ([FromServices] DaprClient daprClient, CancellationToken cancellationToken) =>
+    {
+        var response = await daprClient.AIEngineGetChatsAsync(new DaprAIEngineGetChatsRequest(), cancellationToken);
+
+        return response;
+    })
+    .WithName("Engine: Get Chats")
+    .WithOpenApi();
+
+app.MapGet(
+    "/engine/chats/{instanceId}",
     async (string instanceId, [FromServices] DaprClient daprClient, CancellationToken cancellationToken) =>
     {
         var response = await daprClient.AIEngineGetChatAsync(new DaprAIEngineGetChatRequest(instanceId), cancellationToken);
@@ -34,7 +45,7 @@ app.MapGet(
     .WithOpenApi();
 
 app.MapPost(
-    "/engine/{instanceId}",
+    "/engine/chats/{instanceId}",
     async (string instanceId, [FromBody] EngineCreateRequest request, [FromServices] DaprClient daprClient, CancellationToken cancellationToken) =>
     {
         await daprClient.AIEngineCreateChatAsync(
@@ -50,7 +61,7 @@ app.MapPost(
     .WithOpenApi();
 
 app.MapPost(
-    "/engine/{instanceId}/complete",
+    "/engine/chats/{instanceId}/complete",
     async (string instanceId, [FromBody] EngineCompletionRequest request, [FromServices] DaprClient daprClient, CancellationToken cancellationToken) =>
     {
         var response = await daprClient.AIEngineCompleteTextAsync(
@@ -63,6 +74,17 @@ app.MapPost(
         return response;
     })
     .WithName("Engine: Complete Chat Text")
+    .WithOpenApi();
+
+app.MapDelete(
+    "/engine/chats/{instanceId}",
+    async (string instanceId, [FromServices] DaprClient daprClient, CancellationToken cancellationToken) =>
+    {
+        await daprClient.AIEngineTerminateChatAsync(new DaprAIEngineTerminateChatRequest(instanceId), cancellationToken);
+
+        return Results.Ok();
+    })
+    .WithName("Terminate Chat")
     .WithOpenApi();
 
 app.MapPost(
@@ -85,17 +107,6 @@ app.MapPost(
         return response;
     })
     .WithName("Engine: Summarize")
-    .WithOpenApi();
-
-app.MapDelete(
-    "/engine/{instanceId}",
-    async (string instanceId, [FromServices] DaprClient daprClient, CancellationToken cancellationToken) =>
-    {
-        await daprClient.AIEngineTerminateChatAsync(new DaprAIEngineTerminateChatRequest(instanceId), cancellationToken);
-
-        return Results.Ok();
-    })
-    .WithName("Terminate Chat")
     .WithOpenApi();
 
 app.MapPost(

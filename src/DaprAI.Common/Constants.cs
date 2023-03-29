@@ -19,6 +19,8 @@ public static class Constants
 
         public const string GetChat = "getChat";
 
+        public const string GetChats = "getChats";
+
         public const string SummarizeText = "summarizeText";
 
         public const string TerminateChat = "terminateChat";
