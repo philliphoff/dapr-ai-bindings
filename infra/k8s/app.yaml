@@ -1,0 +1,47 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: nodeapp
+  labels:
+    app: app
+spec:
+  selector:
+    app: app
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 5050
+  type: LoadBalancer
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  labels:
+    app: app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app
+  template:
+    metadata:
+      labels:
+        app: app
+      annotations:
+        dapr.io/enabled: "true"
+        dapr.io/app-id: "app"
+        dapr.io/app-port: "5050"
+        dapr.io/enable-api-logging: "true"
+        dapr.io/pluggable-components: "components"
+    spec:
+      containers:
+      - name: app
+        image: philliphoff/dapr-ai-application:1.0.0
+        ports:
+        - containerPort: 5050
+        imagePullPolicy: Always
+      - name: components
+        image: philliphoff/dapr-ai-components:1.0.0
+        imagePullPolicy: Always
