@@ -28,12 +28,162 @@ The application itself is a basic web API with two endpoints, `/complete` and `/
 
 ![Architecture Diagram](assets/dapr-ai-bindings-diagram.png)
 
+## Prerequisites
+
+- [Dapr 1.10](https://dapr.io/) or later
+- [.NET 7](https://dotnet.microsoft.com/) or later
+- Linux, MacOS, or Windows using WSL
+- A running Redis DB (such as the default Dapr state store container)
+
+To use the Chat GPT binding, you must have an Open AI account and an [API key](https://platform.openai.com/account/api-keys).
+
+To use the Azure AI binding, you must have an [Azure Cognitive Services](https://azure.microsoft.com/en-us/products/cognitive-services/) instance and its access key.
+
+To use the Azure Open AI binding, you must have an [Azure Open AI](https://azure.microsoft.com/en-us/products/cognitive-services/openai-service) instance and its access key. This sample also expects that you've deployed two language models to the service, one named `davinci` and the other named `gpt-35`. (The exact models used for those deployments is not as important, but you could use `text-davinci-003  ` and `gpt-35-turbo`, respectively.)
+
+To use the `.http` files to send requests, install the [REST Client](https://marketplace.visualstudio.com/items?itemName=humao.rest-client) VS Code extension.
+
+## Running in Docker Compose
+
+The `docker-compose.yaml` in the repo root will deploy the application, Dapr sidecar, and the AI components sidecar at the same time, which is useful to get everything running and debugging is not a concern. The application will then be exposed locally on port `5050`.
+
+1. Configure the secrets used by the components: 
+
+   Create a JSON file called `secrets.json` in `./src/DaprAI.Application/components/compose` to hold the access keys. It should look something like:
+
+   ```json
+   {
+      "azure-ai-endpoint": "https://<name>.cognitiveservices.azure.com",
+      "azure-ai-key": "<Azure Cognitive Services key>",
+
+      "azure-open-ai-endpoint": "https://<name>.openai.azure.com"
+      "azure-open-ai-key": "<Azure Open AI API key>"
+
+      "open-api-endpoint": "https://api.openai.com"
+      "open-api-key": "<Open AI API key>",
+
+      "ai-store-host": "<redis host>",
+      "ai-store-password": "<redis password>"
+   }
+   ```
+
+   > Note that the Redis configuration will most likely be `redis` with an empty password.
+
+1. Start the composition:
+
+   ```bash
+   docker compose up
+   ```
+
+   This should build the container images for the application and components, and start them alongside the Dapr sidecar.  At this point, the application should be available at `http://localhost:5050`.
+
+## Running Locally
+
+1. Configure the Dapr components.
+
+   Create a JSON file called `secrets.json` in the repo root folder to hold the access keys. It should look something like:
+
+   ```json
+   {
+      "azure-ai-endpoint": "https://<name>.cognitiveservices.azure.com",
+      "azure-ai-key": "<Azure Cognitive Services key>",
+
+      "azure-open-ai-endpoint": "https://<name>.openai.azure.com"
+      "azure-open-ai-key": "<Azure Open AI API key>"
+
+      "open-api-endpoint": "https://api.openai.com"
+      "open-api-key": "<Open AI API key>",
+
+      "ai-store-host": "<redis host>",
+      "ai-store-password": "<redis password>"
+   }
+   ```
+
+1. Build and run the pluggable components.
+
+   ```bash
+   cd src/DaprAI.PluggableComponents
+   dotnet run
+   ```
+
+1. Build and run the application.
+
+   ```bash
+   dapr run -f ./dapr.yaml
+   ```
+
+1. Send a completion request:
+
+   ```http
+   POST http://localhost:5111/complete HTTP/1.1
+   content-type: application/json
+
+   {
+       "user": "How are you?"
+   }
+   ```
+
+   See the response from Chat GPT:
+
+   ```http
+   HTTP/1.1 200 OK
+   Connection: close
+   Content-Type: application/json; charset=utf-8
+   Date: Mon, 06 Mar 2023 22:01:23 GMT
+   Server: Kestrel
+   Transfer-Encoding: chunked
+
+   {
+     "assistant": "\n\nI'm doing well, thanks for asking. How are you?"
+   }
+   ```
+
+1. Send a summarization request:
+
+   ```http
+   POST http://localhost:5111/summarize HTTP/1.1
+   content-type: application/json
+
+   {
+       "text": "Jupiter is the fifth planet from the Sun and the largest in the Solar System. It is a gas giant with a mass one-thousandth that of the Sun, but two-and-a-half times that of all the other planets in the Solar System combined. Jupiter is one of the brightest objects visible to the naked eye in the night sky, and has been known to ancient civilizations since before recorded history. It is named after the Roman god Jupiter.[19] When viewed from Earth, Jupiter can be bright enough for its reflected light to cast visible shadows,[20] and is on average the third-brightest natural object in the night sky after the Moon and Venus."
+   }
+   ```
+
+   See the response from Chat GPT:
+
+   ```http
+   HTTP/1.1 200 OK
+   Connection: close
+   Content-Type: application/json; charset=utf-8
+   Date: Mon, 20 Mar 2023 21:39:05 GMT
+   Server: Kestrel
+   Transfer-Encoding: chunked
+
+   {
+   "summary": "Jupiter is the largest planet in the Solar System, and it is a gas giant. With a mass two-and-a-half times that of all the other planets in the Solar System combined, it is also the fifth planet from the Sun. Jupiter has been known to ancient civilizations since before recorded history, and it is"
+   }
+   ```
+
+
+   > By default, requests will be made to Open AI's Chat GPT. You can use the query parameter to specify which binding to use:
+   >  - Open AI's Chat GPT (e.g. `?component=open-ai-gpt`)
+   >  - Open AI's Davinci (e.g. `?component=open-ai-davinci`)
+   >  - Azure Open AI Davinci (e.g. `?component=azure-open-ai-davinci`)
+   >  - Azure Open AI Chat GPT (e.g. `?component=azure-open-ai-gpt`)
+   >  - Azure AI (e.g. `?component=azure-ai`)
+   >
+   > Not all operations (i.e. prompt or summarize) are supported by all bindings.
+
+## Reference
+
 ### AI Engine
 
 The "AI engine" consists of an output binding supporting the following operations:
 
 - **`createChat`:** create a chat session
 - **`completeText`:** request a "completion" of (i.e a response to) a user's text prompt
+- **`getChat`:** request the details of an existing chat session
+- **`getChats`:** request the IDs of all chat sessions
 - **`summarizeText`:** request the summarization of a text document (provided inline or via an URL)
 - **`terminateChat`:** delete a chat session
 
@@ -210,149 +360,3 @@ Component configuration metadata:
 | azure-ai-key | Yes | The API key used to access the instance |
 
 > Note that this component does not support text completion.
-
-## Prerequisites
-
-- [Dapr 1.10](https://dapr.io/) or later
-- [.NET 7](https://dotnet.microsoft.com/) or later
-- Linux, MacOS, or Windows using WSL
-- A running Redis DB (such as the default Dapr state store container)
-
-To use the Chat GPT binding, you must have an Open AI account and an [API key](https://platform.openai.com/account/api-keys).
-
-To use the Azure AI binding, you must have an [Azure Cognitive Services](https://azure.microsoft.com/en-us/products/cognitive-services/) instance and its access key.
-
-To use the Azure Open AI binding, you must have an [Azure Open AI](https://azure.microsoft.com/en-us/products/cognitive-services/openai-service) instance and its access key. This sample also expects that you've deployed two language models to the service, one named `davinci` and the other named `gpt-35`. (The exact models used for those deployments is not as important, but you could use `text-davinci-003  ` and `gpt-35-turbo`, respectively.)
-
-To use the `.http` files to send requests, install the [REST Client](https://marketplace.visualstudio.com/items?itemName=humao.rest-client) VS Code extension.
-
-## Running in Docker Compose
-
-The `docker-compose.yaml` in the repo root will deploy the application, Dapr sidecar, and the AI components sidecar at the same time, which is useful to get everything running and debugging is not a concern. The application will then be exposed locally on port `5050`.
-
-1. Configure the secrets used by the components: 
-
-   Create a JSON file called `secrets.json` in `./src/DaprAI.Application/components/compose` to hold the access keys. It should look something like:
-
-   ```json
-   {
-      "azure-ai-endpoint": "https://<name>.cognitiveservices.azure.com",
-      "azure-ai-key": "<Azure Cognitive Services key>",
-
-      "azure-open-ai-endpoint": "https://<name>.openai.azure.com"
-      "azure-open-ai-key": "<Azure Open AI API key>"
-
-      "open-api-endpoint": "https://api.openai.com"
-      "open-api-key": "<Open AI API key>",
-
-      "ai-store-host": "<redis host>",
-      "ai-store-password": "<redis password>"
-   }
-   ```
-
-   > Note that the Redis configuration will most likely be `redis` with an empty password.
-
-1. Start the composition:
-
-   ```bash
-   docker compose up
-   ```
-
-   This should build the container images for the application and components, and start them alongside the Dapr sidecar.  At this point, the application should be available at `http://localhost:5050`.
-
-## Running Locally
-
-1. Configure the Dapr components.
-
-   Create a JSON file called `secrets.json` in the repo root folder to hold the access keys. It should look something like:
-
-   ```json
-   {
-      "azure-ai-endpoint": "https://<name>.cognitiveservices.azure.com",
-      "azure-ai-key": "<Azure Cognitive Services key>",
-
-      "azure-open-ai-endpoint": "https://<name>.openai.azure.com"
-      "azure-open-ai-key": "<Azure Open AI API key>"
-
-      "open-api-endpoint": "https://api.openai.com"
-      "open-api-key": "<Open AI API key>",
-
-      "ai-store-host": "<redis host>",
-      "ai-store-password": "<redis password>"
-   }
-   ```
-
-1. Build and run the pluggable components.
-
-   ```bash
-   cd src/DaprAI.PluggableComponents
-   dotnet run
-   ```
-
-1. Build and run the application.
-
-   ```bash
-   dapr run -f ./dapr.yaml
-   ```
-
-1. Send a completion request:
-
-   ```http
-   POST http://localhost:5111/complete HTTP/1.1
-   content-type: application/json
-
-   {
-       "user": "How are you?"
-   }
-   ```
-
-   See the response from Chat GPT:
-
-   ```http
-   HTTP/1.1 200 OK
-   Connection: close
-   Content-Type: application/json; charset=utf-8
-   Date: Mon, 06 Mar 2023 22:01:23 GMT
-   Server: Kestrel
-   Transfer-Encoding: chunked
-
-   {
-     "assistant": "\n\nI'm doing well, thanks for asking. How are you?"
-   }
-   ```
-
-1. Send a summarization request:
-
-   ```http
-   POST http://localhost:5111/summarize HTTP/1.1
-   content-type: application/json
-
-   {
-       "text": "Jupiter is the fifth planet from the Sun and the largest in the Solar System. It is a gas giant with a mass one-thousandth that of the Sun, but two-and-a-half times that of all the other planets in the Solar System combined. Jupiter is one of the brightest objects visible to the naked eye in the night sky, and has been known to ancient civilizations since before recorded history. It is named after the Roman god Jupiter.[19] When viewed from Earth, Jupiter can be bright enough for its reflected light to cast visible shadows,[20] and is on average the third-brightest natural object in the night sky after the Moon and Venus."
-   }
-   ```
-
-   See the response from Chat GPT:
-
-   ```http
-   HTTP/1.1 200 OK
-   Connection: close
-   Content-Type: application/json; charset=utf-8
-   Date: Mon, 20 Mar 2023 21:39:05 GMT
-   Server: Kestrel
-   Transfer-Encoding: chunked
-
-   {
-   "summary": "Jupiter is the largest planet in the Solar System, and it is a gas giant. With a mass two-and-a-half times that of all the other planets in the Solar System combined, it is also the fifth planet from the Sun. Jupiter has been known to ancient civilizations since before recorded history, and it is"
-   }
-   ```
-
-
-   > By default, requests will be made to Open AI's Chat GPT. You can use the query parameter to specify which binding to use:
-   >  - Open AI's Chat GPT (e.g. `?component=open-ai-gpt`)
-   >  - Open AI's Davinci (e.g. `?component=open-ai-davinci`)
-   >  - Azure Open AI Davinci (e.g. `?component=azure-open-ai-davinci`)
-   >  - Azure Open AI Chat GPT (e.g. `?component=azure-open-ai-gpt`)
-   >  - Azure AI (e.g. `?component=azure-ai`)
-   >
-   > Not all operations (i.e. prompt or summarize) are supported by all bindings.
