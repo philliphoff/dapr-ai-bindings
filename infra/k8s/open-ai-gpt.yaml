@@ -1,0 +1,28 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: open-ai-gpt
+spec:
+  type: bindings.open-ai
+  version: v1
+  metadata:
+    - name: endpoint
+      value: https://api.openai.com
+    - name: key
+      secretKeyRef:
+        name: open-ai
+        key: key
+    - name: model
+      value: gpt-3.5-turbo
+    - name: maxTokens
+      value: 64
+    - name: storeName
+      value: ai-store
+    - name: summarizationInstructions
+      value: "You are an AI assistant that helps 2nd-graders summarize text. Respond to each user's message with a summarization of that message's text."
+    - name: temperature
+      value: 0.9
+    - name: topP
+      value: 1.0
+scopes:
+- app

@@ -1,0 +1,14 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: ai-engine
+spec:
+  type: bindings.ai-engine
+  version: v1
+  metadata:
+  - name: aiName
+    value: open-ai-gpt
+  - name: storeName
+    value: ai-state
+scopes:
+- app
