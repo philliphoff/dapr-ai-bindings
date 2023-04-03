@@ -77,6 +77,41 @@ The `docker-compose.yaml` in the repo root will deploy the application, Dapr sid
 
    This should build the container images for the application and components, and start them alongside the Dapr sidecar.  At this point, the application should be available at `http://localhost:5050`.
 
+## Running in Kubernetes
+
+1. Install Dapr to Kubernetes
+
+   ```bash
+   dapr init -k
+   ```
+
+1. Create a namespace for the application (such as `dapr-ai-bindings`)
+
+   ```bash
+   kubectl create namespace dapr-ai-bindings
+   ```
+
+1. Install Redis to the `dapr-ai-bindings` namespace
+
+   ```bash
+   helm repo add bitnami https://charts.bitnami.com/bitnami
+   helm repo update
+   helm install redis bitnami/redis --set image.tag=6.2 -n dapr-ai-bindings
+   ```
+
+1. Create secret for Open AI binding key
+
+   ```bash
+   kubectl create secret generic open-ai --from-literal=key='<Open AI Key>'
+   ```
+
+1. Install the application to the `dapr-ai-bindings` namespace
+
+   ```bash
+   cd infra/k8s
+   kubectl apply -n dapr-ai-bindings -f '*.yaml'
+   ```
+
 ## Running Locally
 
 1. Configure the Dapr components.

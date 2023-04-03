@@ -31,4 +31,6 @@ app.RegisterService(
         serviceBuilder.RegisterBinding(context => new AzureOpenAIBindings());
     });
 
+System.Threading.Thread.Sleep(2000);
+
 app.Run();

@@ -34,6 +34,7 @@ spec:
         dapr.io/app-id: "app"
         dapr.io/app-port: "5050"
         dapr.io/enable-api-logging: "true"
+        dapr.io/log-level: "debug"
         dapr.io/pluggable-components: "components"
     spec:
       containers:
