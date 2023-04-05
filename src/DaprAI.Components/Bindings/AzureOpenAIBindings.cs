@@ -1,20 +1,21 @@
-using System.Globalization;
 using System.Net.Http.Headers;
-using System.Text;
 using System.Text.Json.Serialization;
 using Dapr.PluggableComponents.Components;
-using DaprAI.Utilities;
 
 namespace DaprAI.Bindings;
 
 internal sealed class AzureOpenAIBindings : OpenAIBindingsBase
 {
+    private const string ApiVersion = "?api-version=2023-03-15-preview";
+
     private static readonly ISet<string> ChatCompletionModels = new HashSet<string>
     {
-        "gpt-35-turbo"
+        "gpt-35-turbo",
+        "gpt-4",
+        "gpt-4-32k"
     };
 
-    private string? azureOpenAIDeployment;
+    private string? deployment;
     private Lazy<Task<bool>> isChatCompletion;
 
     public AzureOpenAIBindings()
@@ -22,11 +23,23 @@ internal sealed class AzureOpenAIBindings : OpenAIBindingsBase
         this.isChatCompletion = new Lazy<Task<bool>>(this.IsDeploymentChatCompletionModel);
     }
 
+    protected override Uri GetCompletionsUrl(bool chatCompletionsUrl)
+    {
+        return new Uri(
+            this.Endpoint!,
+            $"openai/deployments/{this.deployment}/{(chatCompletionsUrl ? "chat/" : "")}completions{ApiVersion}");
+    }
+
+    protected override Task<bool> IsChatCompletionModelAsync(CancellationToken cancellationToken)
+    {
+        return this.isChatCompletion.Value;
+    }
+
     protected override async Task OnInitAsync(MetadataRequest request, CancellationToken cancellationToken = default)
     {
         await base.OnInitAsync(request, cancellationToken);
 
-        if (!request.Properties.TryGetValue("deployment", out this.azureOpenAIDeployment))
+        if (!request.Properties.TryGetValue("deployment", out this.deployment))
         {
             throw new InvalidOperationException("Missing required metadata property 'deployment'.");
         }
@@ -39,113 +52,9 @@ internal sealed class AzureOpenAIBindings : OpenAIBindingsBase
         headers.Add("api-key", this.Key);
     }
 
-    protected override async Task<DaprCompletionResponse> OnCompleteAsync(DaprCompletionRequest promptRequest, CancellationToken cancellationToken)
-    {
-        var isChatCompletion = await this.isChatCompletion.Value;
-
-        CompletionsRequest azureRequest;
-
-        if (isChatCompletion)
-        {
-            var builder = new StringBuilder();
-
-            foreach (var item in promptRequest.History?.Items ?? Enumerable.Empty<DaprChatHistoryItem>())
-            {
-                builder.Append($"<|im_start|>{item.Role}\n{item.Message}\n<|im_end|>\n");
-            }
-
-            builder.Append($"<|im_start|>user\n{promptRequest.UserPrompt}\n<|im_end|>\n");
-            builder.Append("<|im_start|>assistant\n");
-
-            string prompt = builder.ToString();
-
-            azureRequest = new CompletionsRequest(prompt)
-            {
-                Stop = new[] { "<|im_end|>" },
-            };
-        }
-        else
-        {
-            azureRequest = new CompletionsRequest(promptRequest.UserPrompt);
-        }
-
-        azureRequest = azureRequest with
-            {
-                MaxTokens = this.MaxTokens,
-                Temperature = this.Temperature,
-                TopP = this.TopP
-            };
-
-        var response = await this.SendRequestAsync<CompletionsRequest, CompletionsResponse>(
-            azureRequest,
-            new Uri($"{this.Endpoint}/openai/deployments/{this.azureOpenAIDeployment}/completions?api-version=2022-12-01"),
-            cancellationToken);
-
-        var text = response.Choices.FirstOrDefault()?.Text;
-
-        if (text == null)
-        {
-            throw new InvalidOperationException("No text was returned.");
-        }
-
-        return new DaprCompletionResponse(text);
-    }
-
-    protected override async Task<DaprSummarizationResponse> OnSummarizeAsync(DaprSummarizationRequest summarizationRequest, CancellationToken cancellationToken)
-    {
-        string documentText = await SummarizationUtilities.GetDocumentText(summarizationRequest, cancellationToken);
-
-        string summarizationInstructions = String.Format(
-            CultureInfo.CurrentCulture,
-            this.SummarizationInstructions ?? throw new InvalidOperationException("Missing required metadata property 'summarizationInstructions'."),
-            documentText);
-
-        var isChatCompletion = await this.isChatCompletion.Value;
-
-        CompletionsRequest azureRequest;
-
-        if (isChatCompletion)
-        {
-            string system = $"<|im_start|>system\n{summarizationInstructions}\n<|im_end|>\n";
-            string user = $"<|im_start|>user\n{documentText}\n<|im_end|>\n";
-            string prompt = $"{system}{user}<|im_start|>assistant\n";
-
-            azureRequest = new CompletionsRequest(prompt)
-            {
-                Stop = new[] { "<|im_end|>" },
-            };
-        }
-        else
-        {
-            azureRequest = new CompletionsRequest(summarizationInstructions);
-        }
-
-        azureRequest = azureRequest with
-            {
-                MaxTokens = this.MaxTokens,
-                Temperature = this.Temperature,
-                TopP = this.TopP
-            };
-
-        var response = await this.SendRequestAsync<CompletionsRequest, CompletionsResponse>(
-            azureRequest,
-            new Uri($"{this.Endpoint}/openai/deployments/{this.azureOpenAIDeployment}/completions?api-version=2022-12-01"),
-            cancellationToken);
-
-        var summary = response.Choices.FirstOrDefault()?.Text;
-
-        if (summary == null)
-        {
-            throw new InvalidOperationException("No summary was returned.");
-        }
-
-        return new DaprSummarizationResponse(summary);
-    }
-
     private async Task<bool> IsDeploymentChatCompletionModel()
     {
-        var response = await this.HttpClient.GetFromJsonAsync<GetDeploymentResponse>(
-            new Uri($"{this.Endpoint}/openai/deployments/{this.azureOpenAIDeployment}?api-version=2022-12-01"));
+        var response = await this.HttpClient.GetFromJsonAsync<GetDeploymentResponse>(new Uri(this.Endpoint!, $"openai/deployments/{this.deployment}{ApiVersion}"));
 
         return response?.Model != null && ChatCompletionModels.Contains(response.Model);
     }

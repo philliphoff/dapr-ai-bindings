@@ -1,8 +1,5 @@
-using System.Globalization;
 using System.Net.Http.Headers;
-using System.Text.Json.Serialization;
 using Dapr.PluggableComponents.Components;
-using DaprAI.Utilities;
 
 namespace DaprAI.Bindings;
 
@@ -33,131 +30,38 @@ internal sealed class OpenAIBindings : OpenAIBindingsBase
 
     private string? model;
 
+    protected override Uri GetCompletionsUrl(bool chatCompletionsUrl)
+    {
+        return new Uri(
+            this.Endpoint!,
+            chatCompletionsUrl ? "v1/chat/completions" : "v1/completions");
+    }
+
+    protected override Task<bool> IsChatCompletionModelAsync(CancellationToken cancellationToken)
+    {
+        if (this.model == null)
+        {
+            throw new InvalidOperationException("Missing required metadata property 'model'.");
+        }
+        else if (ChatCompletionModels.Contains(this.model))
+        {
+            return Task.FromResult(true);
+        }
+        else if (CompletionModels.Contains(this.model))
+        {
+            return Task.FromResult(false);
+        }
+        else
+        {
+            throw new InvalidOperationException($"Unrecognized model '{this.model}'.");
+        }
+    }
+
     protected override void OnAttachHeaders(HttpRequestHeaders headers)
     {
         base.OnAttachHeaders(headers);
 
         headers.Authorization = new AuthenticationHeaderValue("Bearer", this.Key);
-    }
-
-    private sealed record ChatHistoryItem(
-        [property: JsonPropertyName("role")]
-        string Role,
-
-        [property: JsonPropertyName("message")]
-        string Message);
-
-    private sealed record ChatHistory(
-        [property: JsonPropertyName("items")]
-        ChatHistoryItem[] Items);
-
-    protected override async Task<DaprCompletionResponse> OnCompleteAsync(DaprCompletionRequest completionRequest, CancellationToken cancellationToken)
-    {
-        if (this.IsChatCompletion())
-        {
-            var messages = new List<ChatCompletionMessage>(completionRequest.History?.Items.Select(item => new ChatCompletionMessage(item.Role, item.Message)) ?? Enumerable.Empty<ChatCompletionMessage>());
-
-            messages.Add(new ChatCompletionMessage("user", completionRequest.UserPrompt));
-
-            var response = await this.SendRequestAsync<ChatCompletionsRequest, ChatCompletionsResponse>(
-                new ChatCompletionsRequest(messages.ToArray())
-                {
-                    Model = this.model,
-                    Temperature = this.Temperature,
-                    MaxTokens = this.MaxTokens,
-                    TopP = this.TopP,
-                },
-                new Uri($"{this.Endpoint}/v1/chat/completions"),
-                cancellationToken);
-
-            var content = response.Choices.FirstOrDefault()?.Message?.Content;
-
-            if (content == null)
-            {
-                throw new InvalidOperationException("No chat content was returned.");
-            }
-
-            return new DaprCompletionResponse(content);
-        }
-        else
-        {
-            var response = await this.SendRequestAsync<CompletionsRequest, CompletionsResponse>(
-                new CompletionsRequest(completionRequest.UserPrompt)
-                {
-                    Model = this.model,
-                    Temperature = this.Temperature,
-                    MaxTokens = this.MaxTokens,
-                    TopP = this.TopP
-                },
-                new Uri($"{this.Endpoint}/v1/completions"),
-                cancellationToken);
-
-            var text = response.Choices.FirstOrDefault()?.Text;
-
-            if (text == null)
-            {
-                throw new InvalidOperationException("No text was returned.");
-            }
-
-            return new DaprCompletionResponse(text);
-        }
-    }
-
-    protected override async Task<DaprSummarizationResponse> OnSummarizeAsync(DaprSummarizationRequest summarizationRequest, CancellationToken cancellationToken)
-    {
-        string documentText = await SummarizationUtilities.GetDocumentText(summarizationRequest, cancellationToken);
-
-        string summarizationInstructions = String.Format(
-            CultureInfo.CurrentCulture,
-            this.SummarizationInstructions ?? throw new InvalidOperationException("Missing required metadata property 'summarizationInstructions'."),
-            documentText);
-
-        string? summary;
-
-        if (this.IsChatCompletion())
-        {
-            var response = await this.SendRequestAsync<ChatCompletionsRequest, ChatCompletionsResponse>(
-                new ChatCompletionsRequest(
-                    new[]
-                    {
-                        new ChatCompletionMessage("system", summarizationInstructions),
-                        new ChatCompletionMessage("user", documentText)
-                    })
-                {
-                    Model = this.model,
-                    Temperature = this.Temperature,
-                    MaxTokens = this.MaxTokens,
-                    TopP = this.TopP,
-                },
-                new Uri($"{this.Endpoint}/v1/chat/completions"),
-                cancellationToken);
-
-            summary = response.Choices.FirstOrDefault()?.Message?.Content;
-        }
-        else
-        {
-            string prompt = $"Summarize the following text: {documentText}";
-
-            var response = await this.SendRequestAsync<CompletionsRequest, CompletionsResponse>(
-                new CompletionsRequest(summarizationInstructions)
-                {
-                    Model = this.model,
-                    Temperature = this.Temperature,
-                    MaxTokens = this.MaxTokens,
-                    TopP = this.TopP
-                },
-                new Uri($"{this.Endpoint}/v1/completions"),
-                cancellationToken);
-
-            summary = response.Choices.FirstOrDefault()?.Text;
-        }
-
-        if (summary == null)
-        {
-            throw new InvalidOperationException("No summary was returned.");
-        }
-
-        return new DaprSummarizationResponse(summary);
     }
 
     protected override async Task OnInitAsync(MetadataRequest request, CancellationToken cancellationToken)
@@ -170,23 +74,13 @@ internal sealed class OpenAIBindings : OpenAIBindingsBase
         }
     }
 
-    private bool IsChatCompletion()
+    protected override ChatCompletionsRequest UpdateChatCompletionsRequest(ChatCompletionsRequest request)
     {
-        if (this.model == null)
-        {
-            throw new InvalidOperationException("Missing required metadata property 'model'.");
-        }
-        else if (ChatCompletionModels.Contains(this.model))
-        {
-            return true;
-        }
-        else if (CompletionModels.Contains(this.model))
-        {
-            return false;
-        }
-        else
-        {
-            throw new InvalidOperationException($"Unrecognized model '{this.model}'.");
-        }
+        return request with { Model = this.model };
+    }
+
+    protected override CompletionsRequest UpdateCompletionsRequest(CompletionsRequest request)
+    {
+        return request with { Model = this.model };
     }
 }
