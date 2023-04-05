@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -41,7 +42,7 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
         this.HttpClient = new HttpClient(new HeadersProcessingHandler(this.OnAttachHeaders));
     }
 
-    protected string? Endpoint { get; private set; }
+    protected Uri? Endpoint { get; private set; }
 
     protected string? Key { get; private set; }
 
@@ -79,11 +80,32 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
 
     #endregion
 
+    protected virtual void OnAttachHeaders(HttpRequestHeaders headers)
+    {
+    }
+
+    protected abstract Uri GetCompletionsUrl(Uri baseEndpoint, bool chatCompletionsUrl);
+
+    protected virtual Task<bool> IsChatCompletionModelAsync(CancellationToken cancellationToken)
+    {
+        return Task.FromResult(false);
+    }
+
+    protected virtual ChatCompletionsRequest UpdateChatCompletionsRequest(ChatCompletionsRequest request)
+    {
+        return request;
+    }
+
+    protected virtual CompletionsRequest UpdateCompletionsRequest(CompletionsRequest request)
+    {
+        return request;
+    }
+
     protected virtual Task OnInitAsync(MetadataRequest request, CancellationToken cancellationToken)
     {
         if (request.Properties.TryGetValue("endpoint", out var endpoint))
         {
-            this.Endpoint = endpoint;
+            this.Endpoint = new Uri(endpoint);
         }
         else
         {
@@ -127,14 +149,122 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
         return Task.CompletedTask;
     }
 
-    protected abstract Task<DaprCompletionResponse> OnCompleteAsync(DaprCompletionRequest completionRequest, CancellationToken cancellationToken);
-    protected abstract Task<DaprSummarizationResponse> OnSummarizeAsync(DaprSummarizationRequest summarizeRequest, CancellationToken cancellationToken);
-    
-    protected virtual void OnAttachHeaders(HttpRequestHeaders headers)
+    private async Task<DaprCompletionResponse> OnCompleteAsync(DaprCompletionRequest completionRequest, CancellationToken cancellationToken)
     {
+        if (await this.IsChatCompletionModelAsync(cancellationToken))
+        {
+            var messages = new List<ChatCompletionMessage>(completionRequest.History?.Items.Select(item => new ChatCompletionMessage(item.Role, item.Message)) ?? Enumerable.Empty<ChatCompletionMessage>());
+
+            messages.Add(new ChatCompletionMessage("user", completionRequest.UserPrompt));
+
+            var request = this.UpdateChatCompletionsRequest(
+                new ChatCompletionsRequest(messages.ToArray())
+                {
+                    Temperature = this.Temperature,
+                    MaxTokens = this.MaxTokens,
+                    TopP = this.TopP,
+                });
+
+            var response = await this.SendRequestAsync<ChatCompletionsRequest, ChatCompletionsResponse>(
+                request,
+                this.GetCompletionsUrl(this.Endpoint!, true),
+                cancellationToken);
+
+            var content = response.Choices.FirstOrDefault()?.Message?.Content;
+
+            if (content == null)
+            {
+                throw new InvalidOperationException("No chat content was returned.");
+            }
+
+            return new DaprCompletionResponse(content);
+        }
+        else
+        {
+            var request = this.UpdateCompletionsRequest(
+                new CompletionsRequest(completionRequest.UserPrompt)
+                {
+                    Temperature = this.Temperature,
+                    MaxTokens = this.MaxTokens,
+                    TopP = this.TopP
+                });
+
+            var response = await this.SendRequestAsync<CompletionsRequest, CompletionsResponse>(
+                request,
+                this.GetCompletionsUrl(this.Endpoint!, false),
+                cancellationToken);
+
+            var text = response.Choices.FirstOrDefault()?.Text;
+
+            if (text == null)
+            {
+                throw new InvalidOperationException("No text was returned.");
+            }
+
+            return new DaprCompletionResponse(text);
+        }
     }
 
-    protected async Task<TResponse> SendRequestAsync<TRequest, TResponse>(TRequest request, Uri url, CancellationToken cancellationToken)
+    private async Task<DaprSummarizationResponse> OnSummarizeAsync(DaprSummarizationRequest summarizationRequest, CancellationToken cancellationToken)
+    {
+        string documentText = await SummarizationUtilities.GetDocumentText(summarizationRequest, cancellationToken);
+
+        string summarizationInstructions = String.Format(
+            CultureInfo.CurrentCulture,
+            this.SummarizationInstructions ?? throw new InvalidOperationException("Missing required metadata property 'summarizationInstructions'."),
+            documentText);
+
+        string? summary;
+
+        if (await this.IsChatCompletionModelAsync(cancellationToken))
+        {
+            var request = this.UpdateChatCompletionsRequest(
+                new ChatCompletionsRequest(
+                    new[]
+                    {
+                        new ChatCompletionMessage("system", summarizationInstructions),
+                        new ChatCompletionMessage("user", documentText)
+                    })
+                {
+                    Temperature = this.Temperature,
+                    MaxTokens = this.MaxTokens,
+                    TopP = this.TopP,
+                });
+
+            var response = await this.SendRequestAsync<ChatCompletionsRequest, ChatCompletionsResponse>(
+                request,
+                this.GetCompletionsUrl(this.Endpoint!, true),
+                cancellationToken);
+
+            summary = response.Choices.FirstOrDefault()?.Message?.Content;
+        }
+        else
+        {
+            var request = this.UpdateCompletionsRequest(
+                new CompletionsRequest(summarizationInstructions)
+                {
+                    Temperature = this.Temperature,
+                    MaxTokens = this.MaxTokens,
+                    TopP = this.TopP
+                });
+
+            var response = await this.SendRequestAsync<CompletionsRequest, CompletionsResponse>(
+                request,
+                this.GetCompletionsUrl(this.Endpoint!, false),
+                cancellationToken);
+
+            summary = response.Choices.FirstOrDefault()?.Text;
+        }
+
+        if (summary == null)
+        {
+            throw new InvalidOperationException("No summary was returned.");
+        }
+
+        return new DaprSummarizationResponse(summary);
+    }
+    
+    private async Task<TResponse> SendRequestAsync<TRequest, TResponse>(TRequest request, Uri url, CancellationToken cancellationToken)
     {
         var message = new HttpRequestMessage(HttpMethod.Post, url)
         {
@@ -165,11 +295,6 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
         var completionResponse = await this.OnCompleteAsync(completionRequest, cancellationToken);
 
         return new OutputBindingInvokeResponse { Data = SerializationUtilities.ToBytes(completionResponse) };
-    }
-
-    private Task<OutputBindingInvokeResponse> InitializeAIAsync(OutputBindingInvokeRequest request, CancellationToken cancellationToken)
-    {
-        return Task.FromResult(new OutputBindingInvokeResponse());
     }
 
     private async Task<OutputBindingInvokeResponse> SummarizeAsync(OutputBindingInvokeRequest request, CancellationToken cancellationToken)
