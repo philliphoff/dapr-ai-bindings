@@ -1,0 +1,28 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: azure-open-ai-gpt-3
+spec:
+  type: bindings.azure-open-ai
+  version: v1
+  metadata:
+    - name: deployment
+      value: gpt-35
+    - name: endpoint
+      secretKeyRef:
+        name: azure-open-ai-endpoint
+        key: azure-open-ai-endpoint
+    - name: key
+      secretKeyRef:
+        name: azure-open-ai-key
+        key: azure-open-ai-key
+    - name: maxTokens
+      value: 64
+    - name: summarizationInstructions
+      value: "You are an AI assistant that helps 2nd-graders summarize text. Respond to each user's message with a summarization of that message's text."
+    - name: temperature
+      value: 0.9
+    - name: topP
+      value: 1.0
+auth:
+  secretStore: secrets

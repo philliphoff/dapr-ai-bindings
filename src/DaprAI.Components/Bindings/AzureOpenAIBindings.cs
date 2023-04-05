@@ -11,7 +11,9 @@ internal sealed class AzureOpenAIBindings : OpenAIBindingsBase
 {
     private static readonly ISet<string> ChatCompletionModels = new HashSet<string>
     {
-        "gpt-35-turbo"
+        "gpt-35-turbo",
+        "gpt-4",
+        "gpt-4-32k"
     };
 
     private string? azureOpenAIDeployment;
@@ -43,45 +45,44 @@ internal sealed class AzureOpenAIBindings : OpenAIBindingsBase
     {
         var isChatCompletion = await this.isChatCompletion.Value;
 
-        CompletionsRequest azureRequest;
+        string? text;
 
         if (isChatCompletion)
         {
-            var builder = new StringBuilder();
+            var messages = new List<ChatCompletionMessage>(promptRequest.History?.Items.Select(item => new ChatCompletionMessage(item.Role, item.Message)) ?? Enumerable.Empty<ChatCompletionMessage>());
 
-            foreach (var item in promptRequest.History?.Items ?? Enumerable.Empty<DaprChatHistoryItem>())
-            {
-                builder.Append($"<|im_start|>{item.Role}\n{item.Message}\n<|im_end|>\n");
-            }
+            messages.Add(new ChatCompletionMessage("user", promptRequest.UserPrompt));
 
-            builder.Append($"<|im_start|>user\n{promptRequest.UserPrompt}\n<|im_end|>\n");
-            builder.Append("<|im_start|>assistant\n");
-
-            string prompt = builder.ToString();
-
-            azureRequest = new CompletionsRequest(prompt)
-            {
-                Stop = new[] { "<|im_end|>" },
-            };
-        }
-        else
-        {
-            azureRequest = new CompletionsRequest(promptRequest.UserPrompt);
-        }
-
-        azureRequest = azureRequest with
+            var azureRequest = new ChatCompletionsRequest(messages.ToArray())
             {
                 MaxTokens = this.MaxTokens,
                 Temperature = this.Temperature,
                 TopP = this.TopP
             };
 
-        var response = await this.SendRequestAsync<CompletionsRequest, CompletionsResponse>(
-            azureRequest,
-            new Uri($"{this.Endpoint}/openai/deployments/{this.azureOpenAIDeployment}/completions?api-version=2022-12-01"),
-            cancellationToken);
+            var response = await this.SendRequestAsync<ChatCompletionsRequest, ChatCompletionsResponse>(
+                azureRequest,
+                new Uri($"{this.Endpoint}/openai/deployments/{this.azureOpenAIDeployment}/chat/completions?api-version=2023-03-15-preview"),
+                cancellationToken);
 
-        var text = response.Choices.FirstOrDefault()?.Text;
+            text = response.Choices.FirstOrDefault()?.Message?.Content;
+        }
+        else
+        {
+            var azureRequest = new CompletionsRequest(promptRequest.UserPrompt)
+            {
+                MaxTokens = this.MaxTokens,
+                Temperature = this.Temperature,
+                TopP = this.TopP
+            };
+
+            var response = await this.SendRequestAsync<CompletionsRequest, CompletionsResponse>(
+                azureRequest,
+                new Uri($"{this.Endpoint}/openai/deployments/{this.azureOpenAIDeployment}/completions?api-version=2023-03-15-preview"),
+                cancellationToken);
+
+            text = response.Choices.FirstOrDefault()?.Text;
+        }
 
         if (text == null)
         {

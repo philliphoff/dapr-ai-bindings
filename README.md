@@ -169,7 +169,8 @@ The `docker-compose.yaml` in the repo root will deploy the application, Dapr sid
    >  - Open AI's Chat GPT (e.g. `?component=open-ai-gpt`)
    >  - Open AI's Davinci (e.g. `?component=open-ai-davinci`)
    >  - Azure Open AI Davinci (e.g. `?component=azure-open-ai-davinci`)
-   >  - Azure Open AI Chat GPT (e.g. `?component=azure-open-ai-gpt`)
+   >  - Azure Open AI Chat GPT 3.5 (e.g. `?component=azure-open-ai-gpt-3`)
+   >  - Azure Open AI Chat GPT 4 (e.g. `?component=azure-open-ai-gpt-4`)
    >  - Azure AI (e.g. `?component=azure-ai`)
    >
    > Not all operations (i.e. prompt or summarize) are supported by all bindings.
