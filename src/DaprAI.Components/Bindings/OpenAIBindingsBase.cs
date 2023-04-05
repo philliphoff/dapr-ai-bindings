@@ -3,7 +3,6 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Dapr.Client;
 using Dapr.PluggableComponents.Components;
 using Dapr.PluggableComponents.Components.Bindings;
 using DaprAI.Utilities;
@@ -84,7 +83,7 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
     {
     }
 
-    protected abstract Uri GetCompletionsUrl(Uri baseEndpoint, bool chatCompletionsUrl);
+    protected abstract Uri GetCompletionsUrl(bool chatCompletionsUrl);
 
     protected virtual Task<bool> IsChatCompletionModelAsync(CancellationToken cancellationToken)
     {
@@ -167,7 +166,7 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
 
             var response = await this.SendRequestAsync<ChatCompletionsRequest, ChatCompletionsResponse>(
                 request,
-                this.GetCompletionsUrl(this.Endpoint!, true),
+                this.GetCompletionsUrl(true),
                 cancellationToken);
 
             var content = response.Choices.FirstOrDefault()?.Message?.Content;
@@ -191,7 +190,7 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
 
             var response = await this.SendRequestAsync<CompletionsRequest, CompletionsResponse>(
                 request,
-                this.GetCompletionsUrl(this.Endpoint!, false),
+                this.GetCompletionsUrl(false),
                 cancellationToken);
 
             var text = response.Choices.FirstOrDefault()?.Text;
@@ -233,7 +232,7 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
 
             var response = await this.SendRequestAsync<ChatCompletionsRequest, ChatCompletionsResponse>(
                 request,
-                this.GetCompletionsUrl(this.Endpoint!, true),
+                this.GetCompletionsUrl(true),
                 cancellationToken);
 
             summary = response.Choices.FirstOrDefault()?.Message?.Content;
@@ -250,7 +249,7 @@ internal abstract class OpenAIBindingsBase : IOutputBinding
 
             var response = await this.SendRequestAsync<CompletionsRequest, CompletionsResponse>(
                 request,
-                this.GetCompletionsUrl(this.Endpoint!, false),
+                this.GetCompletionsUrl(false),
                 cancellationToken);
 
             summary = response.Choices.FirstOrDefault()?.Text;

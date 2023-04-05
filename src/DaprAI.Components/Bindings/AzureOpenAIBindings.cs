@@ -1,14 +1,13 @@
-using System.Globalization;
 using System.Net.Http.Headers;
-using System.Text;
 using System.Text.Json.Serialization;
 using Dapr.PluggableComponents.Components;
-using DaprAI.Utilities;
 
 namespace DaprAI.Bindings;
 
 internal sealed class AzureOpenAIBindings : OpenAIBindingsBase
 {
+    private const string ApiVersion = "?api-version=2023-03-15-preview";
+
     private static readonly ISet<string> ChatCompletionModels = new HashSet<string>
     {
         "gpt-35-turbo",
@@ -24,13 +23,11 @@ internal sealed class AzureOpenAIBindings : OpenAIBindingsBase
         this.isChatCompletion = new Lazy<Task<bool>>(this.IsDeploymentChatCompletionModel);
     }
 
-    protected override Uri GetCompletionsUrl(Uri baseEndpoint, bool chatCompletionsUrl)
+    protected override Uri GetCompletionsUrl(bool chatCompletionsUrl)
     {
         return new Uri(
-            baseEndpoint,
-            chatCompletionsUrl
-                ? $"openai/deployments/{this.deployment}/chat/completions?api-version=2023-03-15-preview"
-                : $"openai/deployments/{this.deployment}/completions?api-version=2023-03-15-preview");
+            this.Endpoint!,
+            $"openai/deployments/{this.deployment}/{(chatCompletionsUrl ? "chat/" : "")}completions{ApiVersion}");
     }
 
     protected override Task<bool> IsChatCompletionModelAsync(CancellationToken cancellationToken)
@@ -57,8 +54,7 @@ internal sealed class AzureOpenAIBindings : OpenAIBindingsBase
 
     private async Task<bool> IsDeploymentChatCompletionModel()
     {
-        var response = await this.HttpClient.GetFromJsonAsync<GetDeploymentResponse>(
-            new Uri($"{this.Endpoint}/openai/deployments/{this.deployment}?api-version=2022-12-01"));
+        var response = await this.HttpClient.GetFromJsonAsync<GetDeploymentResponse>(new Uri(this.Endpoint!, $"openai/deployments/{this.deployment}{ApiVersion}"));
 
         return response?.Model != null && ChatCompletionModels.Contains(response.Model);
     }

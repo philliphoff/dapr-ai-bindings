@@ -1,8 +1,5 @@
-using System.Globalization;
 using System.Net.Http.Headers;
-using System.Text.Json.Serialization;
 using Dapr.PluggableComponents.Components;
-using DaprAI.Utilities;
 
 namespace DaprAI.Bindings;
 
@@ -33,10 +30,10 @@ internal sealed class OpenAIBindings : OpenAIBindingsBase
 
     private string? model;
 
-    protected override Uri GetCompletionsUrl(Uri baseEndpoint, bool chatCompletionsUrl)
+    protected override Uri GetCompletionsUrl(bool chatCompletionsUrl)
     {
         return new Uri(
-            baseEndpoint,
+            this.Endpoint!,
             chatCompletionsUrl ? "v1/chat/completions" : "v1/completions");
     }
 
